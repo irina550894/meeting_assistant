@@ -15,6 +15,7 @@ from app.persistence.database import AsyncSessionFactory
 from app.persistence.repositories import SqlAlchemyBackgroundJobRepository
 from app.settings.config import Settings, get_settings
 from app.worker.jobs import GoogleEventChecker, ReminderSender, WorkerRunResult, WorkerService
+from app.worker.scheduler import BackgroundJobScheduler
 
 configure_logging()
 logger = get_logger(__name__)
@@ -50,9 +51,24 @@ def run_worker_once(service: WorkerService | None = None) -> WorkerRunResult:
 
 async def run_worker_loop_async() -> None:
     settings = get_settings()
+    await recover_jobs_once_async()
     while True:
         await run_worker_once_async()
         await asyncio.sleep(settings.worker_poll_interval_seconds)
+
+
+async def recover_jobs_once_async() -> int:
+    settings = get_settings()
+    async with AsyncSessionFactory() as session:
+        repository = SqlAlchemyBackgroundJobRepository(session)
+        scheduler = BackgroundJobScheduler(repository=repository, settings=settings)
+        recovered = await scheduler.recover_jobs(now=datetime.now(UTC))
+        await session.commit()
+        logger.info(
+            "Background jobs recovered",
+            extra={"event": "background_jobs_recovered", "jobs": recovered},
+        )
+        return recovered
 
 
 def log_worker_tick() -> None:

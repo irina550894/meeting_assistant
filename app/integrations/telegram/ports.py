@@ -88,6 +88,22 @@ class CalendarEventGateway(Protocol):
     async def cancel_event(self, event_id: str) -> None: ...
 
 
+class BackgroundJobSchedulerPort(Protocol):
+    async def schedule_booking_created(
+        self,
+        booking: BookingRecord,
+        *,
+        now: datetime,
+    ) -> None: ...
+
+    async def schedule_booking_confirmed(
+        self,
+        booking: BookingRecord,
+        *,
+        now: datetime,
+    ) -> None: ...
+
+
 @dataclass(slots=True)
 class UserFlowDependencies:
     settings: Settings
@@ -100,6 +116,7 @@ class UserFlowDependencies:
     clock: Callable[[], datetime]
     notifier: UserFlowNotifier | None = None
     calendar_events: CalendarEventGateway | None = None
+    background_jobs: BackgroundJobSchedulerPort | None = None
 
 
 @dataclass(slots=True)
@@ -112,3 +129,4 @@ class AdminFlowDependencies:
     calendar: CalendarConfirmationGateway
     clock: Callable[[], datetime]
     notifier: AdminNotifier | None = None
+    background_jobs: BackgroundJobSchedulerPort | None = None

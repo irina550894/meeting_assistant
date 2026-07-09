@@ -6,6 +6,8 @@ from datetime import datetime
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.booking import BookingRecord
+from app.core.booking import BookingStatus as CoreBookingStatus
 from app.persistence.models import AuditLog, BackgroundJob, Booking, SlotReservation, User
 from app.persistence.models.enums import (
     AuditActorType,
@@ -13,11 +15,43 @@ from app.persistence.models.enums import (
     BookingStatus,
 )
 from app.worker.jobs import BackgroundJobRecord, ReminderBooking
+from app.worker.scheduler import BackgroundJobScheduleRequest
 
 
 class SqlAlchemyBackgroundJobRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def enqueue_job(self, request: BackgroundJobScheduleRequest) -> uuid.UUID:
+        existing = (
+            await self.session.scalars(
+                select(BackgroundJob).where(
+                    BackgroundJob.job_type == request.job_type,
+                    BackgroundJob.booking_id == request.booking_id,
+                    BackgroundJob.payload == request.payload,
+                    BackgroundJob.status.in_(
+                        [
+                            BackgroundJobStatus.PENDING.value,
+                            BackgroundJobStatus.RUNNING.value,
+                        ]
+                    ),
+                )
+            )
+        ).first()
+        if existing is not None:
+            return existing.id
+
+        job = BackgroundJob(
+            job_type=request.job_type,
+            status=BackgroundJobStatus.PENDING.value,
+            run_at=request.run_at,
+            max_attempts=request.max_attempts,
+            payload=request.payload,
+            booking_id=request.booking_id,
+        )
+        self.session.add(job)
+        await self.session.flush()
+        return job.id
 
     async def claim_due_job(
         self,
@@ -149,6 +183,24 @@ class SqlAlchemyBackgroundJobRepository:
         await self.session.flush()
         return int(result.rowcount or 0)
 
+    async def list_pending_bookings_for_ttl(self, *, now: datetime) -> list[BookingRecord]:
+        bookings = await self.session.scalars(
+            select(Booking).where(
+                Booking.status == BookingStatus.PENDING.value,
+                Booking.reserved_until.is_not(None),
+            )
+        )
+        return [_booking_record(booking) for booking in bookings]
+
+    async def list_confirmed_bookings_for_reminders(self, *, now: datetime) -> list[BookingRecord]:
+        bookings = await self.session.scalars(
+            select(Booking).where(
+                Booking.status == BookingStatus.CONFIRMED.value,
+                Booking.starts_at > now,
+            )
+        )
+        return [_booking_record(booking) for booking in bookings]
+
 
 def _job_record(job: BackgroundJob) -> BackgroundJobRecord:
     return BackgroundJobRecord(
@@ -158,4 +210,26 @@ def _job_record(job: BackgroundJob) -> BackgroundJobRecord:
         max_attempts=job.max_attempts,
         payload=dict(job.payload or {}),
         booking_id=job.booking_id,
+    )
+
+
+def _booking_record(booking: Booking) -> BookingRecord:
+    return BookingRecord(
+        id=booking.id,
+        user_id=booking.user_id,
+        meeting_type_id=booking.meeting_type_id,
+        duration_minutes=booking.duration_minutes,
+        starts_at=booking.starts_at,
+        ends_at=booking.ends_at,
+        status=CoreBookingStatus(booking.status),
+        user_comment=booking.user_comment,
+        rejection_reason=booking.rejection_reason,
+        cancellation_reason=booking.cancellation_reason,
+        reserved_until=booking.reserved_until,
+        google_calendar_event_id=booking.google_calendar_event_id,
+        meeting_url=booking.meeting_url,
+        is_reschedule_request=booking.is_reschedule_request,
+        previous_booking_id=booking.previous_booking_id,
+        created_at=booking.created_at,
+        updated_at=booking.updated_at,
     )

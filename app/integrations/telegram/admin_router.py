@@ -354,6 +354,8 @@ async def _confirm_booking(
         return
     await deps.bookings.save_booking(card.booking)
     await deps.bookings.save_audit_entries([audit])
+    if deps.background_jobs:
+        await deps.background_jobs.schedule_booking_confirmed(card.booking, now=deps.clock())
     if deps.notifier:
         await deps.notifier.booking_confirmed(card.booking)
     await callback.answer()
@@ -398,6 +400,8 @@ async def _confirm_booking_message(
         return
     await deps.bookings.save_booking(card.booking)
     await deps.bookings.save_audit_entries([audit])
+    if deps.background_jobs:
+        await deps.background_jobs.schedule_booking_confirmed(card.booking, now=deps.clock())
     if deps.notifier:
         await deps.notifier.booking_confirmed(card.booking)
     await message.answer(messages.BOOKING_CONFIRMED, reply_markup=admin_menu_keyboard())

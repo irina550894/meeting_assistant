@@ -284,6 +284,11 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             return
         await deps.users.save(user)
         await deps.bookings.save_booking_result(result)
+        if deps.background_jobs:
+            await deps.background_jobs.schedule_booking_created(
+                result.booking,
+                now=result.booking.created_at or deps.clock(),
+            )
         if deps.notifier:
             if result.booking.is_reschedule_request:
                 await deps.notifier.reschedule_requested(result.booking)
