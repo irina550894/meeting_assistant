@@ -99,6 +99,18 @@ class BookingService:
         )
         return audit
 
+    def ensure_user_can_start_booking(
+        self,
+        *,
+        user: UserProfile,
+        existing_bookings: Iterable[BookingRecord],
+    ) -> None:
+        if not user.has_personal_data_consent:
+            self._raise_rule("personal_data_consent_required", "Personal data consent is required.")
+        if user.is_blocked:
+            self._raise_rule("user_blocked", "Blocked users cannot create bookings.")
+        self._ensure_active_booking_limit(user=user, existing_bookings=existing_bookings)
+
     def create_booking(
         self,
         *,
@@ -358,10 +370,7 @@ class BookingService:
     ) -> None:
         if not final_confirmation:
             self._raise_rule("final_confirmation_required", "Booking requires final confirmation.")
-        if not user.has_personal_data_consent:
-            self._raise_rule("personal_data_consent_required", "Personal data consent is required.")
-        if user.is_blocked:
-            self._raise_rule("user_blocked", "Blocked users cannot create bookings.")
+        self.ensure_user_can_start_booking(user=user, existing_bookings=existing_bookings)
         if not meeting_type.is_active:
             self._raise_rule("meeting_type_inactive", "Meeting type is inactive.")
         if duration_minutes not in meeting_type.allowed_durations_minutes:
@@ -369,6 +378,12 @@ class BookingService:
         if starts_at >= ends_at:
             self._raise_rule("invalid_time_range", "Booking start must be before end.")
 
+    def _ensure_active_booking_limit(
+        self,
+        *,
+        user: UserProfile,
+        existing_bookings: Iterable[BookingRecord],
+    ) -> None:
         active_count = sum(
             1 for booking in existing_bookings if booking.user_id == user.id and booking.is_active
         )
