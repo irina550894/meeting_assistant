@@ -1,7 +1,12 @@
 from types import SimpleNamespace
 
 import pytest
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 from app.integrations.telegram import messages
 from app.integrations.telegram.user_router import _edit_or_answer

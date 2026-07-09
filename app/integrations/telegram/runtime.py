@@ -8,6 +8,13 @@ from aiogram.enums import ParseMode
 from app.core.admin_flow import AdminFlowService
 from app.core.booking import BookingService
 from app.core.user_flow import UserFlowService
+from app.integrations.google_calendar import (
+    GoogleCalendarClient,
+    GoogleCalendarConfirmationGateway,
+    GoogleCalendarEventGateway,
+    GoogleCalendarScheduleProvider,
+    GoogleOAuthTokens,
+)
 from app.integrations.telegram.admin_router import create_admin_router
 from app.integrations.telegram.local_memory import (
     InMemoryRuntimeStore,
@@ -21,6 +28,7 @@ from app.integrations.telegram.ports import AdminFlowDependencies, UserFlowDepen
 from app.integrations.telegram.user_router import create_user_router
 from app.logging.config import configure_logging, get_logger
 from app.settings.config import get_settings
+from pydantic import SecretStr
 
 logger = get_logger(__name__)
 
@@ -51,16 +59,30 @@ async def run_local_polling() -> None:
     def clock() -> datetime:
         return datetime.now(tz=timezone)
 
+    google_calendar = _google_calendar_runtime(settings)
+    schedule_provider = (
+        GoogleCalendarScheduleProvider(base=store, client=google_calendar)
+        if google_calendar
+        else store
+    )
+    confirmation_gateway = (
+        GoogleCalendarConfirmationGateway(google_calendar)
+        if google_calendar
+        else LocalCalendarConfirmationGateway()
+    )
+    event_gateway = GoogleCalendarEventGateway(google_calendar) if google_calendar else None
+
     user_deps = UserFlowDependencies(
         settings=settings,
         users=store,
         meeting_types=store,
         bookings=store,
-        schedule=store,
+        schedule=schedule_provider,
         flow=UserFlowService(booking_service=booking_service),
         booking_service=booking_service,
         clock=clock,
         notifier=TelegramUserFlowNotifier(bot=bot, settings=settings),
+        calendar_events=event_gateway,
     )
     admin_deps = AdminFlowDependencies(
         settings=settings,
@@ -68,7 +90,7 @@ async def run_local_polling() -> None:
         meeting_types=store,
         bookings=store,
         admin_flow=AdminFlowService(booking_service=booking_service),
-        calendar=LocalCalendarConfirmationGateway(),
+        calendar=confirmation_gateway,
         clock=clock,
         notifier=TelegramAdminNotifier(bot=bot, store=store),
     )
@@ -86,3 +108,20 @@ async def run_local_polling() -> None:
         },
     )
     await dispatcher.start_polling(bot)
+
+
+def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:
+    if not (
+        settings.google_oauth_client_id
+        and settings.google_oauth_client_secret
+        and settings.google_oauth_refresh_token
+    ):
+        return None
+    tokens = GoogleOAuthTokens(
+        access_token=None,
+        refresh_token=settings.google_oauth_refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.google_oauth_client_id,
+        client_secret=SecretStr(settings.google_oauth_client_secret.get_secret_value()),
+    )
+    return GoogleCalendarClient(settings=settings, token_provider=lambda: tokens)

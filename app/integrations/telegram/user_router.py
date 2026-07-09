@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from app.core.booking import BookingRecord, BusinessRuleError, MeetingType, UserProfile
 from app.core.user_flow import BookingDraft, UserFlowError
+from app.integrations.google_calendar import GoogleCalendarError
 from app.integrations.telegram import messages
 from app.integrations.telegram.keyboards import (
     BACK,
@@ -357,6 +358,19 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             return
         await deps.bookings.save_booking(booking)
         await deps.bookings.save_audit_entries([audit])
+        if deps.calendar_events and booking.google_calendar_event_id:
+            try:
+                await deps.calendar_events.cancel_event(booking.google_calendar_event_id)
+            except GoogleCalendarError as error:
+                logger.warning(
+                    "Google Calendar event cancellation failed",
+                    extra={
+                        "event": "google_api_error",
+                        "operation": "cancel_event",
+                        "booking_id": str(booking.id),
+                        "error_code": error.code,
+                    },
+                )
         if deps.notifier:
             await deps.notifier.booking_cancelled_by_user(booking)
         await state.clear()

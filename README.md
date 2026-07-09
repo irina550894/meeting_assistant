@@ -60,7 +60,22 @@ PERSONAL_DATA_POLICY_URL=https://example.com/policy
 DEFAULT_MEETING_URL=https://telemost.yandex.ru/j/75500242705811
 ```
 
-9. Run tests:
+9. Optional Google Calendar local check:
+
+```dotenv
+GOOGLE_OAUTH_CLIENT_ID=<Google OAuth client ID>
+GOOGLE_OAUTH_CLIENT_SECRET=<Google OAuth client secret>
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/oauth/google/callback
+GOOGLE_OAUTH_REFRESH_TOKEN=<refresh token for local polling, do not commit>
+GOOGLE_CALENDAR_ID=primary
+GOOGLE_ADMIN_EMAIL=<admin email for calendar invites>
+```
+
+Start the FastAPI app and open `/oauth/google/start` to get the authorization URL. The
+current local callback stores tokens in process memory; for Telegram polling checks use
+`GOOGLE_OAUTH_REFRESH_TOKEN` in the local `.env`. Do not commit real Google secrets.
+
+10. Run tests:
 
 ```powershell
 pytest

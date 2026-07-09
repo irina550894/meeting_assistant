@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: SecretStr | None = None
     google_oauth_redirect_uri: str | None = None
+    google_oauth_refresh_token: SecretStr | None = None
     google_calendar_id: str = "primary"
     google_admin_email: str | None = None
 
@@ -71,6 +72,7 @@ class Settings(BaseSettings):
         "google_oauth_client_id",
         "google_oauth_client_secret",
         "google_oauth_redirect_uri",
+        "google_oauth_refresh_token",
         "google_admin_email",
         "default_meeting_url",
         "personal_data_consent_url",
@@ -97,6 +99,7 @@ class Settings(BaseSettings):
             "google_oauth_configured": bool(
                 self.google_oauth_client_id and self.google_oauth_client_secret
             ),
+            "google_refresh_token_configured": self.google_oauth_refresh_token is not None,
         }
 
 

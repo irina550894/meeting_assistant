@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.interfaces.http.routes.google_oauth import router as google_oauth_router
 from app.interfaces.http.routes.health import router as health_router
 from app.logging.config import configure_logging, get_logger
 from app.settings.config import get_settings
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     application.include_router(health_router)
+    application.include_router(google_oauth_router)
     return application
 
 

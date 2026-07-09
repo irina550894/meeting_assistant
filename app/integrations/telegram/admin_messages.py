@@ -14,5 +14,9 @@ USER_UNBLOCKED = "Пользователь разблокирован."
 USER_MESSAGE_PROMPT = "Введите сообщение для пользователя."
 USER_MESSAGE_SENT = "Сообщение пользователю отправлено."
 ACTION_UNAVAILABLE = "Действие сейчас недоступно."
+GOOGLE_CALENDAR_ERROR = "Возникла ошибка Google Calendar. Заявка пока не подтверждена."
+GOOGLE_CALENDAR_NOT_CONNECTED = (
+    "Google Calendar не подключен. Подключите календарь и повторите действие."
+)
 SETTINGS_PLACEHOLDER = "Раздел подготовлен для подключения persistence-адаптеров этапа 6."
 DEFAULT_MEETING_URL_MISSING = "Ссылка онлайн-встречи по умолчанию не настроена."

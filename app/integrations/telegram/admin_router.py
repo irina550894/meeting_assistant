@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.core.admin_flow import AdminBookingCard, AdminFlowError
 from app.core.booking import BookingRecord, BusinessRuleError
+from app.integrations.google_calendar import GoogleCalendarError, GoogleCalendarNotConnectedError
 from app.integrations.telegram import admin_messages as messages
 from app.integrations.telegram.admin_keyboards import (
     admin_booking_actions_keyboard,
@@ -345,6 +346,12 @@ async def _confirm_booking(
     except BusinessRuleError as error:
         await callback.answer(error.rule, show_alert=True)
         return
+    except GoogleCalendarNotConnectedError:
+        await callback.answer(messages.GOOGLE_CALENDAR_NOT_CONNECTED, show_alert=True)
+        return
+    except GoogleCalendarError:
+        await callback.answer(messages.GOOGLE_CALENDAR_ERROR, show_alert=True)
+        return
     await deps.bookings.save_booking(card.booking)
     await deps.bookings.save_audit_entries([audit])
     if deps.notifier:
@@ -382,6 +389,12 @@ async def _confirm_booking_message(
         )
     except BusinessRuleError as error:
         await message.answer(error.rule)
+        return
+    except GoogleCalendarNotConnectedError:
+        await message.answer(messages.GOOGLE_CALENDAR_NOT_CONNECTED)
+        return
+    except GoogleCalendarError:
+        await message.answer(messages.GOOGLE_CALENDAR_ERROR)
         return
     await deps.bookings.save_booking(card.booking)
     await deps.bookings.save_audit_entries([audit])

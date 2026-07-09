@@ -84,6 +84,10 @@ class CalendarConfirmationGateway(Protocol):
     ) -> AdminConfirmationResult: ...
 
 
+class CalendarEventGateway(Protocol):
+    async def cancel_event(self, event_id: str) -> None: ...
+
+
 @dataclass(slots=True)
 class UserFlowDependencies:
     settings: Settings
@@ -95,6 +99,7 @@ class UserFlowDependencies:
     booking_service: BookingService
     clock: Callable[[], datetime]
     notifier: UserFlowNotifier | None = None
+    calendar_events: CalendarEventGateway | None = None
 
 
 @dataclass(slots=True)
