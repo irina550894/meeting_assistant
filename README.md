@@ -45,3 +45,17 @@ python -m app.worker.main
 ```powershell
 pytest
 ```
+
+## Database Migrations
+
+Apply migrations:
+
+```powershell
+alembic upgrade head
+```
+
+Rollback the last migration:
+
+```powershell
+alembic downgrade -1
+```
