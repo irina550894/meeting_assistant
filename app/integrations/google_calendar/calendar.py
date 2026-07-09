@@ -135,6 +135,28 @@ class GoogleCalendarClient:
             raise GoogleCalendarApiError("cancel_event") from error
         logger.info("Google Calendar event cancelled", extra={"event": "google_event_cancelled"})
 
+    def ensure_event_exists(self, *, event_id: str) -> None:
+        service = self._service()
+        try:
+            service.events().get(
+                calendarId=self.settings.google_calendar_id,
+                eventId=event_id,
+            ).execute()
+        except HttpError as error:
+            if getattr(error.resp, "status", None) == 404:
+                logger.warning(
+                    "Google Calendar event missing",
+                    extra={"event": "google_event_missing"},
+                )
+                raise GoogleCalendarEventMissingError() from error
+            self._raise_for_http_error(error, operation="get_event")
+        except Exception as error:
+            logger.error(
+                "Google Calendar API error",
+                extra={"event": "google_api_error", "operation": "get_event"},
+            )
+            raise GoogleCalendarApiError("get_event") from error
+
     def _event_body(
         self,
         *,

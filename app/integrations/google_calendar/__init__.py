@@ -18,6 +18,7 @@ from app.integrations.google_calendar.token_store import (
     GoogleOAuthTokenStore,
     InMemoryGoogleOAuthTokenStore,
 )
+from app.integrations.google_calendar.worker import GoogleCalendarEventChecker
 
 __all__ = [
     "CALENDAR_SCOPES",
@@ -27,6 +28,7 @@ __all__ = [
     "GoogleCalendarConfirmationGateway",
     "GoogleCalendarError",
     "GoogleCalendarEventGateway",
+    "GoogleCalendarEventChecker",
     "GoogleCalendarEventMissingError",
     "GoogleCalendarNotConnectedError",
     "GoogleOAuthService",
