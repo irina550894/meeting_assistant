@@ -204,6 +204,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
         if not meeting_type or draft.duration_minutes is None:
             await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
             return
+        await callback.answer()
         schedule = await deps.schedule.context_for_date(selected)
         slots = deps.flow.public_slots(
             target_date=selected,
@@ -218,7 +219,6 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             slots=[(slot.starts_at.isoformat(), slot.ends_at.isoformat()) for slot in slots]
         )
         await state.set_state(UserBookingStates.time)
-        await callback.answer()
         if not slots:
             await _edit_or_answer(
                 callback,
