@@ -2,9 +2,10 @@ from datetime import date, datetime
 from uuid import UUID
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from app.core.booking import BookingRecord, BusinessRuleError, MeetingType, UserProfile
 from app.core.user_flow import BookingDraft, UserFlowError
@@ -619,7 +620,16 @@ async def _send(target: Message | CallbackQuery, text: str, **kwargs) -> None:
 
 async def _edit_or_answer(callback: CallbackQuery, text: str, **kwargs) -> None:
     if callback.message:
-        await callback.message.answer(text, **kwargs)
+        reply_markup = kwargs.get("reply_markup")
+        if reply_markup is not None and not isinstance(reply_markup, InlineKeyboardMarkup):
+            await callback.message.answer(text, **kwargs)
+            return
+        try:
+            await callback.message.edit_text(text, **kwargs)
+        except TelegramBadRequest as error:
+            if "message is not modified" in str(error).lower():
+                return
+            await callback.message.answer(text, **kwargs)
 
 
 async def _save_draft(state: FSMContext, draft: BookingDraft) -> None:
