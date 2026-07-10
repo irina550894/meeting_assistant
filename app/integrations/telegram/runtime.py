@@ -4,10 +4,12 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from pydantic import SecretStr
 
 from app.core.admin_flow import AdminFlowService
 from app.core.booking import BookingService
 from app.core.user_flow import UserFlowService
+from app.diagnostics import DiagnosticsService
 from app.integrations.google_calendar import (
     GoogleCalendarClient,
     GoogleCalendarConfirmationGateway,
@@ -28,7 +30,6 @@ from app.integrations.telegram.ports import AdminFlowDependencies, UserFlowDepen
 from app.integrations.telegram.user_router import create_user_router
 from app.logging.config import configure_logging, get_logger
 from app.settings.config import get_settings
-from pydantic import SecretStr
 
 logger = get_logger(__name__)
 
@@ -93,6 +94,7 @@ async def run_local_polling() -> None:
         calendar=confirmation_gateway,
         clock=clock,
         notifier=TelegramAdminNotifier(bot=bot, store=store),
+        diagnostics=DiagnosticsService(settings),
     )
 
     dispatcher = Dispatcher()

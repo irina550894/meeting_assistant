@@ -94,3 +94,31 @@ Rollback the last migration:
 ```powershell
 alembic downgrade -1
 ```
+
+## Logs And Diagnostics
+
+Application logs are JSON lines. Useful fields:
+
+- `timestamp`: UTC log time.
+- `level`: `debug`, `info`, `warning`, `error`, or `critical`.
+- `event`: machine-readable event name.
+- `operation_id`: request or scenario correlation id.
+- `service`: `app`, `worker`, or another component name when provided.
+
+Useful searches:
+
+```powershell
+Select-String -Path .logs\*.log -Pattern '"level": "error"'
+Select-String -Path .logs\*.log -Pattern 'google_api_error'
+Select-String -Path .logs\*.log -Pattern 'telegram_api_error'
+Select-String -Path .logs\*.log -Pattern 'operation_id'
+```
+
+Telegram admin diagnostics:
+
+```text
+/diag
+```
+
+The diagnostics output uses only safe configured true/false flags and does not print
+tokens, passwords, OAuth client secrets, refresh tokens, or real values from `.env`.

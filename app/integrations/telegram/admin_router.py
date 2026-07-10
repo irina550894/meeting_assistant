@@ -36,6 +36,16 @@ def create_admin_router(deps: AdminFlowDependencies) -> Router:
         await state.clear()
         await message.answer(messages.ADMIN_MENU, reply_markup=admin_menu_keyboard())
 
+    @router.message(Command("diag"))
+    async def diagnostics_message(message: Message) -> None:
+        if not await _ensure_admin_message(message, deps):
+            return
+        if deps.diagnostics is None:
+            await message.answer("Diagnostics are not configured.")
+            return
+        report = await deps.diagnostics.build_report()
+        await message.answer(_diagnostics_text(report), parse_mode=None)
+
     @router.callback_query(F.data == "adm:menu")
     async def admin_menu_callback(callback: CallbackQuery, state: FSMContext) -> None:
         if not await _ensure_admin_callback(callback, deps):
@@ -543,6 +553,15 @@ def _admin_access_error_text(error: AdminFlowError) -> str:
     if error.code == "admin_not_configured":
         return messages.ADMIN_NOT_CONFIGURED
     return messages.ADMIN_ACCESS_DENIED
+
+
+def _diagnostics_text(report) -> str:
+    lines = [f"Diagnostics: {report.status}"]
+    for check in report.checks:
+        lines.append(f"{check.name}: {check.status} - {check.message}")
+        for key, value in check.details.items():
+            lines.append(f"  {key}: {value}")
+    return "\n".join(lines)
 
 
 async def _answer(callback: CallbackQuery, text: str, **kwargs) -> None:

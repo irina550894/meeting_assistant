@@ -104,6 +104,10 @@ class BackgroundJobSchedulerPort(Protocol):
     ) -> None: ...
 
 
+class DiagnosticsProvider(Protocol):
+    async def build_report(self): ...
+
+
 @dataclass(slots=True)
 class UserFlowDependencies:
     settings: Settings
@@ -130,3 +134,4 @@ class AdminFlowDependencies:
     clock: Callable[[], datetime]
     notifier: AdminNotifier | None = None
     background_jobs: BackgroundJobSchedulerPort | None = None
+    diagnostics: DiagnosticsProvider | None = None
