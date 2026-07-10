@@ -374,6 +374,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
                         "operation": "cancel_event",
                         "booking_id": str(booking.id),
                         "error_code": error.code,
+                        "error_type": type(error).__name__,
                     },
                 )
         if deps.notifier:

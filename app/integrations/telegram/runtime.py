@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from pydantic import SecretStr
 
@@ -18,6 +19,7 @@ from app.integrations.google_calendar import (
     GoogleOAuthTokens,
 )
 from app.integrations.telegram.admin_router import create_admin_router
+from app.integrations.telegram.critical_notifications import notify_critical_admin
 from app.integrations.telegram.local_memory import (
     InMemoryRuntimeStore,
     LocalCalendarConfirmationGateway,
@@ -29,6 +31,7 @@ from app.integrations.telegram.local_notifiers import (
 from app.integrations.telegram.ports import AdminFlowDependencies, UserFlowDependencies
 from app.integrations.telegram.user_router import create_user_router
 from app.logging.config import configure_logging, get_logger
+from app.persistence.database import AsyncSessionFactory
 from app.settings.config import get_settings
 
 logger = get_logger(__name__)
@@ -47,6 +50,7 @@ async def run_local_polling() -> None:
 
     bot = Bot(
         token=settings.telegram_bot_token.get_secret_value(),
+        session=AiohttpSession(timeout=settings.telegram_request_timeout_seconds),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     store = InMemoryRuntimeStore(settings)
@@ -94,7 +98,13 @@ async def run_local_polling() -> None:
         calendar=confirmation_gateway,
         clock=clock,
         notifier=TelegramAdminNotifier(bot=bot, store=store),
-        diagnostics=DiagnosticsService(settings),
+        diagnostics=DiagnosticsService(
+            settings,
+            session_factory=AsyncSessionFactory,
+            telegram_bot=bot,
+            google_calendar=google_calendar,
+            now=clock,
+        ),
     )
 
     dispatcher = Dispatcher()
@@ -109,7 +119,26 @@ async def run_local_polling() -> None:
             "storage": "in_memory",
         },
     )
-    await dispatcher.start_polling(bot)
+    try:
+        await dispatcher.start_polling(bot)
+    except Exception as error:
+        logger.critical(
+            "Telegram polling failed",
+            extra={
+                "event": "critical_error",
+                "source": "telegram_polling",
+                "error_type": type(error).__name__,
+            },
+        )
+        await notify_critical_admin(
+            settings,
+            source="telegram_polling",
+            error_type=type(error).__name__,
+            bot=bot,
+        )
+        raise
+    finally:
+        await bot.session.close()
 
 
 def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:

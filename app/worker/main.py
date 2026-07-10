@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime
 
 from aiogram import Bot
+from aiogram.client.session.aiohttp import AiohttpSession
 from pydantic import SecretStr
 
 from app.integrations.google_calendar import (
@@ -9,6 +10,7 @@ from app.integrations.google_calendar import (
     GoogleCalendarEventChecker,
     GoogleOAuthTokens,
 )
+from app.integrations.telegram.critical_notifications import notify_critical_admin
 from app.integrations.telegram.worker_notifications import TelegramReminderSender
 from app.logging.config import configure_logging, get_logger
 from app.persistence.database import AsyncSessionFactory
@@ -86,7 +88,10 @@ def log_worker_tick() -> None:
 def _telegram_bot(settings: Settings) -> Bot | None:
     if settings.telegram_bot_token is None:
         return None
-    return Bot(token=settings.telegram_bot_token.get_secret_value())
+    return Bot(
+        token=settings.telegram_bot_token.get_secret_value(),
+        session=AiohttpSession(timeout=settings.telegram_request_timeout_seconds),
+    )
 
 
 def _reminder_sender(bot: Bot | None) -> ReminderSender | None:
@@ -127,6 +132,24 @@ def main() -> None:
         asyncio.run(run_worker_loop_async())
     except KeyboardInterrupt:
         logger.info("Worker stopped", extra={"event": "worker_stopped", "service": "worker"})
+    except Exception as error:
+        logger.critical(
+            "Worker failed",
+            extra={
+                "event": "critical_error",
+                "source": "worker",
+                "service": "worker",
+                "error_type": type(error).__name__,
+            },
+        )
+        asyncio.run(
+            notify_critical_admin(
+                settings,
+                source="worker",
+                error_type=type(error).__name__,
+            )
+        )
+        raise
 
 
 if __name__ == "__main__":

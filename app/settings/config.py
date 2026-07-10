@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_admin_id: int | None = None
     telegram_use_webhook: bool = False
+    telegram_request_timeout_seconds: int = 10
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432

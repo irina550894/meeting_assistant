@@ -283,7 +283,18 @@ def create_admin_router(deps: AdminFlowDependencies) -> Router:
         if not text:
             await message.answer(messages.ACTION_UNAVAILABLE)
             return
-        await bot.send_message(chat_id=user.telegram_id, text=text, parse_mode=None)
+        try:
+            await bot.send_message(chat_id=user.telegram_id, text=text, parse_mode=None)
+        except Exception as error:
+            logger.error(
+                "Telegram message delivery failed",
+                extra={
+                    "event": "telegram_api_error",
+                    "operation": "admin_send_user_message",
+                    "error_type": type(error).__name__,
+                },
+            )
+            raise
         audit = deps.admin_flow.message_sent_audit(
             user_id=user.id,
             now=deps.clock(),
@@ -356,10 +367,12 @@ async def _confirm_booking(
     except BusinessRuleError as error:
         await callback.answer(error.rule, show_alert=True)
         return
-    except GoogleCalendarNotConnectedError:
+    except GoogleCalendarNotConnectedError as error:
+        _log_google_calendar_error(error, operation="admin_confirm_booking")
         await callback.answer(messages.GOOGLE_CALENDAR_NOT_CONNECTED, show_alert=True)
         return
-    except GoogleCalendarError:
+    except GoogleCalendarError as error:
+        _log_google_calendar_error(error, operation="admin_confirm_booking")
         await callback.answer(messages.GOOGLE_CALENDAR_ERROR, show_alert=True)
         return
     await deps.bookings.save_booking(card.booking)
@@ -402,10 +415,12 @@ async def _confirm_booking_message(
     except BusinessRuleError as error:
         await message.answer(error.rule)
         return
-    except GoogleCalendarNotConnectedError:
+    except GoogleCalendarNotConnectedError as error:
+        _log_google_calendar_error(error, operation="admin_confirm_booking_message")
         await message.answer(messages.GOOGLE_CALENDAR_NOT_CONNECTED)
         return
-    except GoogleCalendarError:
+    except GoogleCalendarError as error:
+        _log_google_calendar_error(error, operation="admin_confirm_booking_message")
         await message.answer(messages.GOOGLE_CALENDAR_ERROR)
         return
     await deps.bookings.save_booking(card.booking)
@@ -562,6 +577,18 @@ def _diagnostics_text(report) -> str:
         for key, value in check.details.items():
             lines.append(f"  {key}: {value}")
     return "\n".join(lines)
+
+
+def _log_google_calendar_error(error: GoogleCalendarError, *, operation: str) -> None:
+    logger.error(
+        "Google Calendar admin flow failed",
+        extra={
+            "event": "google_api_error",
+            "operation": operation,
+            "error_code": error.code,
+            "error_type": type(error).__name__,
+        },
+    )
 
 
 async def _answer(callback: CallbackQuery, text: str, **kwargs) -> None:
