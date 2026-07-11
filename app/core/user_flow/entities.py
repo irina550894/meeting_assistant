@@ -3,7 +3,12 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
 
-from app.core.scheduling import BusyInterval, ScheduleRestriction, ScheduleSettings, WorkingHoursRule
+from app.core.scheduling import (
+    BusyInterval,
+    ScheduleRestriction,
+    ScheduleSettings,
+    WorkingHoursRule,
+)
 
 
 class UserFlowStep(StrEnum):

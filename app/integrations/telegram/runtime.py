@@ -125,6 +125,7 @@ async def run_local_polling() -> None:
             google_calendar=google_calendar,
             now=clock,
         ),
+        admin_settings=store,
     )
 
     dispatcher = Dispatcher()

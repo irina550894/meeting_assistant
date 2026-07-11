@@ -32,7 +32,7 @@ class ScheduleSettings:
     timezone: str = "Europe/Moscow"
     min_booking_lead_days: int = 1
     booking_horizon_days: int = 30
-    slot_step_minutes: int = 30
+    slot_step_minutes: int = 60
     meeting_buffer_minutes: int = 90
 
 

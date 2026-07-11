@@ -4,7 +4,6 @@ import pytest
 
 from app.core.booking import BookingService, BookingStatus, BusinessRuleError, MeetingType
 
-
 NOW = datetime(2026, 7, 9, 12, 0, tzinfo=UTC)
 
 

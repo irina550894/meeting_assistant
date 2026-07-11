@@ -8,7 +8,7 @@ from app.core.booking.entities import (
     UserProfile,
 )
 from app.core.booking.errors import BusinessRuleError
-from app.core.booking.service import BookingCreationResult, BookingService, BlockUserResult
+from app.core.booking.service import BlockUserResult, BookingCreationResult, BookingService
 
 __all__ = [
     "ACTIVE_BOOKING_STATUSES",

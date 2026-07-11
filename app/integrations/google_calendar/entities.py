@@ -4,7 +4,6 @@ from datetime import datetime
 from google.oauth2.credentials import Credentials
 from pydantic import SecretStr
 
-
 CALENDAR_SCOPES = ("https://www.googleapis.com/auth/calendar",)
 
 

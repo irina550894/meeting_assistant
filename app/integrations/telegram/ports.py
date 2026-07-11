@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Protocol
 from uuid import UUID
 
@@ -108,6 +108,76 @@ class DiagnosticsProvider(Protocol):
     async def build_report(self): ...
 
 
+@dataclass(frozen=True, slots=True)
+class AdminScheduleSettings:
+    timezone: str
+    min_booking_lead_days: int
+    booking_horizon_days: int
+    slot_step_minutes: int
+    meeting_buffer_minutes: int
+
+
+@dataclass(frozen=True, slots=True)
+class AdminWorkingHoursRule:
+    weekday: int
+    is_working_day: bool
+    start_time: time | None = None
+    end_time: time | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminScheduleRestriction:
+    id: UUID
+    restriction_date: date
+    restriction_type: str
+    start_time: time | None = None
+    end_time: time | None = None
+    admin_comment: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminMeetingType:
+    id: UUID
+    name: str
+    allowed_durations_minutes: tuple[int, ...]
+    is_fixed_duration: bool
+    is_active: bool
+
+
+class AdminSettingsStore(Protocol):
+    async def get_schedule_settings(self) -> AdminScheduleSettings: ...
+
+    async def list_working_hours(self) -> list[AdminWorkingHoursRule]: ...
+
+    async def list_upcoming_restrictions(
+        self,
+        *,
+        from_date: date,
+    ) -> list[AdminScheduleRestriction]: ...
+
+    async def add_closed_day_restriction(
+        self,
+        *,
+        restriction_date: date,
+        admin_comment: str | None,
+    ) -> None: ...
+
+    async def delete_restriction(self, restriction_id: UUID) -> bool: ...
+
+    async def list_meeting_types_admin(self) -> list[AdminMeetingType]: ...
+
+    async def add_meeting_type(
+        self,
+        *,
+        name: str,
+        allowed_durations_minutes: tuple[int, ...],
+        is_fixed_duration: bool,
+    ) -> AdminMeetingType | None: ...
+
+    async def set_meeting_type_active(self, meeting_type_id: UUID, *, is_active: bool) -> bool:
+        ...
+
+
 @dataclass(slots=True)
 class UserFlowDependencies:
     settings: Settings
@@ -135,3 +205,4 @@ class AdminFlowDependencies:
     notifier: AdminNotifier | None = None
     background_jobs: BackgroundJobSchedulerPort | None = None
     diagnostics: DiagnosticsProvider | None = None
+    admin_settings: AdminSettingsStore | None = None

@@ -80,16 +80,13 @@ def test_slots_do_not_exceed_booking_horizon() -> None:
     assert result.exclusion_counts[SlotExclusionReason.OUT_OF_BOOKING_RANGE] == 1
 
 
-def test_slots_stay_inside_working_hours_with_30_minute_step() -> None:
+def test_slots_stay_inside_working_hours_with_60_minute_step() -> None:
     result = calculate(duration_minutes=60)
 
     assert [slot.starts_at.time() for slot in result.slots] == [
         time(10, 0),
-        time(10, 30),
         time(11, 0),
-        time(11, 30),
         time(12, 0),
-        time(12, 30),
         time(13, 0),
     ]
 
@@ -120,10 +117,10 @@ def test_manual_interval_blocks_overlapping_slots() -> None:
         ]
     )
 
-    blocked_starts = {time(10, 30), time(11, 0), time(11, 30)}
+    blocked_starts = {time(11, 0)}
 
     assert all(slot.starts_at.time() not in blocked_starts for slot in result.slots)
-    assert result.exclusion_counts[SlotExclusionReason.MANUAL_RESTRICTION] == 3
+    assert result.exclusion_counts[SlotExclusionReason.MANUAL_RESTRICTION] == 1
 
 
 def test_calendar_busy_interval_uses_buffer_without_exposing_details() -> None:
@@ -138,7 +135,7 @@ def test_calendar_busy_interval_uses_buffer_without_exposing_details() -> None:
     )
 
     assert result.slots == []
-    assert result.exclusion_counts == {SlotExclusionReason.CALENDAR_BUSY: 7}
+    assert result.exclusion_counts == {SlotExclusionReason.CALENDAR_BUSY: 4}
 
 
 def test_active_reservation_blocks_slots() -> None:
@@ -152,7 +149,7 @@ def test_active_reservation_blocks_slots() -> None:
         ]
     )
 
-    assert result.exclusion_counts[SlotExclusionReason.ACTIVE_RESERVATION] == 5
+    assert result.exclusion_counts[SlotExclusionReason.ACTIVE_RESERVATION] == 3
 
 
 def test_diagnostics_duration_is_fixed_to_60_minutes() -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -33,6 +33,12 @@ from app.core.scheduling import (
     ScheduleSettings as CoreScheduleSettings,
 )
 from app.core.user_flow import FlowScheduleContext
+from app.integrations.telegram.ports import (
+    AdminMeetingType,
+    AdminScheduleRestriction,
+    AdminScheduleSettings,
+    AdminWorkingHoursRule,
+)
 from app.persistence.models import (
     AuditLog,
     Booking,
@@ -216,6 +222,107 @@ class SqlAlchemyTelegramRuntimeStore:
             restrictions=restrictions,
             busy_intervals=busy_intervals,
         )
+
+    async def get_schedule_settings(self) -> AdminScheduleSettings:
+        async with self.session_factory() as session:
+            settings = await _schedule_settings(session, self.settings)
+        return AdminScheduleSettings(
+            timezone=settings.timezone,
+            min_booking_lead_days=settings.min_booking_lead_days,
+            booking_horizon_days=settings.booking_horizon_days,
+            slot_step_minutes=settings.slot_step_minutes,
+            meeting_buffer_minutes=settings.meeting_buffer_minutes,
+        )
+
+    async def list_working_hours(self) -> list[AdminWorkingHoursRule]:
+        async with self.session_factory() as session:
+            rows = await _working_hours(session)
+        return [
+            AdminWorkingHoursRule(
+                weekday=row.weekday,
+                is_working_day=row.is_working_day,
+                start_time=row.start_time,
+                end_time=row.end_time,
+            )
+            for row in rows
+        ]
+
+    async def list_upcoming_restrictions(
+        self,
+        *,
+        from_date: date,
+    ) -> list[AdminScheduleRestriction]:
+        async with self.session_factory() as session:
+            rows = await session.scalars(
+                select(ScheduleRestrictionModel)
+                .where(ScheduleRestrictionModel.restriction_date >= from_date)
+                .order_by(ScheduleRestrictionModel.restriction_date)
+                .limit(20)
+            )
+            return [_admin_restriction(row) for row in rows]
+
+    async def add_closed_day_restriction(
+        self,
+        *,
+        restriction_date: date,
+        admin_comment: str | None,
+    ) -> None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                session.add(
+                    ScheduleRestrictionModel(
+                        restriction_type=CoreRestrictionType.CLOSED_DAY.value,
+                        restriction_date=restriction_date,
+                        admin_comment=admin_comment,
+                    )
+                )
+
+    async def delete_restriction(self, restriction_id: UUID) -> bool:
+        async with self.session_factory() as session:
+            async with session.begin():
+                restriction = await session.get(ScheduleRestrictionModel, restriction_id)
+                if restriction is None:
+                    return False
+                await session.delete(restriction)
+                return True
+
+    async def list_meeting_types_admin(self) -> list[AdminMeetingType]:
+        async with self.session_factory() as session:
+            rows = await session.scalars(select(MeetingTypeModel).order_by(MeetingTypeModel.name))
+            return [_admin_meeting_type(row) for row in rows]
+
+    async def add_meeting_type(
+        self,
+        *,
+        name: str,
+        allowed_durations_minutes: tuple[int, ...],
+        is_fixed_duration: bool,
+    ) -> AdminMeetingType | None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                existing = await session.scalar(
+                    select(MeetingTypeModel).where(MeetingTypeModel.name == name)
+                )
+                if existing is not None:
+                    return None
+                meeting_type = MeetingTypeModel(
+                    name=name,
+                    slug=f"custom-{uuid4().hex[:16]}",
+                    allowed_durations_minutes=list(allowed_durations_minutes),
+                    is_fixed_duration=is_fixed_duration,
+                    is_active=True,
+                )
+                session.add(meeting_type)
+            return _admin_meeting_type(meeting_type)
+
+    async def set_meeting_type_active(self, meeting_type_id: UUID, *, is_active: bool) -> bool:
+        async with self.session_factory() as session:
+            async with session.begin():
+                meeting_type = await session.get(MeetingTypeModel, meeting_type_id)
+                if meeting_type is None:
+                    return False
+                meeting_type.is_active = is_active
+                return True
 
 
 async def _get_booking_model(session: AsyncSession, booking_id: UUID) -> Booking | None:
@@ -439,6 +546,27 @@ def _meeting_type(meeting_type: MeetingTypeModel) -> MeetingType:
         allowed_durations_minutes=tuple(meeting_type.allowed_durations_minutes),
         is_fixed_duration=meeting_type.is_fixed_duration,
         is_active=meeting_type.is_active,
+    )
+
+
+def _admin_meeting_type(meeting_type: MeetingTypeModel) -> AdminMeetingType:
+    return AdminMeetingType(
+        id=meeting_type.id,
+        name=meeting_type.name,
+        allowed_durations_minutes=tuple(meeting_type.allowed_durations_minutes),
+        is_fixed_duration=meeting_type.is_fixed_duration,
+        is_active=meeting_type.is_active,
+    )
+
+
+def _admin_restriction(restriction: ScheduleRestrictionModel) -> AdminScheduleRestriction:
+    return AdminScheduleRestriction(
+        id=restriction.id,
+        restriction_date=restriction.restriction_date,
+        restriction_type=restriction.restriction_type,
+        start_time=restriction.start_time,
+        end_time=restriction.end_time,
+        admin_comment=restriction.admin_comment,
     )
 
 

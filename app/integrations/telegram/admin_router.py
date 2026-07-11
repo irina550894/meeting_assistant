@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from aiogram import Bot, F, Router
@@ -6,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.core.admin_flow import AdminBookingCard, AdminFlowError
-from app.core.booking import BookingRecord, BusinessRuleError
+from app.core.booking import BookingRecord, BookingStatus, BusinessRuleError
 from app.integrations.google_calendar import GoogleCalendarError, GoogleCalendarNotConnectedError
 from app.integrations.telegram import admin_messages as messages
 from app.integrations.telegram.admin_keyboards import (
@@ -17,10 +18,18 @@ from app.integrations.telegram.admin_keyboards import (
     back_to_admin_menu_keyboard,
     block_confirm_keyboard,
     blocked_users_keyboard,
+    booking_filters_keyboard,
+    meeting_types_admin_keyboard,
     reject_keyboard,
+    restrictions_keyboard,
 )
 from app.integrations.telegram.admin_states import AdminStates
-from app.integrations.telegram.ports import AdminFlowDependencies
+from app.integrations.telegram.ports import (
+    AdminFlowDependencies,
+    AdminScheduleSettings,
+    AdminWorkingHoursRule,
+)
+from app.integrations.telegram.status_labels import booking_status_label
 from app.logging.config import get_logger
 
 logger = get_logger(__name__)
@@ -304,28 +313,240 @@ def create_admin_router(deps: AdminFlowDependencies) -> Router:
         await state.clear()
         await message.answer(messages.USER_MESSAGE_SENT, reply_markup=admin_menu_keyboard())
 
-    @router.callback_query(
-        F.data.in_({"adm:schedule", "adm:restrictions", "adm:meeting_types", "adm:filters"})
-    )
-    async def settings_placeholder_callback(callback: CallbackQuery) -> None:
+    @router.callback_query(F.data == "adm:schedule")
+    async def schedule_callback(callback: CallbackQuery) -> None:
         if not await _ensure_admin_callback(callback, deps):
             return
-        logger.info(
-            "Admin opened settings section",
-            extra={
-                "event": "admin_action",
-                "action": callback.data,
-                "admin_id": callback.from_user.id,
-            },
-        )
         await callback.answer()
+        if deps.admin_settings is None:
+            await _answer(
+                callback,
+                messages.ACTION_UNAVAILABLE,
+                reply_markup=back_to_admin_menu_keyboard(),
+            )
+            return
+        settings = await deps.admin_settings.get_schedule_settings()
+        working_hours = await deps.admin_settings.list_working_hours()
         await _answer(
             callback,
-            messages.SETTINGS_PLACEHOLDER,
+            _schedule_text(settings, working_hours),
             reply_markup=back_to_admin_menu_keyboard(),
         )
 
+    @router.callback_query(F.data == "adm:restrictions")
+    async def restrictions_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        await callback.answer()
+        await _show_restrictions(callback, deps)
+
+    @router.callback_query(F.data == "adm:restriction_add")
+    async def restriction_add_callback(callback: CallbackQuery, state: FSMContext) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        await state.set_state(AdminStates.closed_day_date)
+        await callback.answer()
+        await _answer(
+            callback,
+            "Введите дату закрытого дня в формате ДД.ММ.ГГГГ.",
+            reply_markup=back_to_admin_menu_keyboard(),
+        )
+
+    @router.message(AdminStates.closed_day_date)
+    async def closed_day_date_message(message: Message, state: FSMContext) -> None:
+        if not await _ensure_admin_message(message, deps):
+            return
+        if deps.admin_settings is None:
+            await message.answer(messages.ACTION_UNAVAILABLE)
+            await state.clear()
+            return
+        try:
+            restriction_date = datetime.strptime((message.text or "").strip(), "%d.%m.%Y").date()
+        except ValueError:
+            await message.answer("Дата должна быть в формате ДД.ММ.ГГГГ.")
+            return
+        await deps.admin_settings.add_closed_day_restriction(
+            restriction_date=restriction_date,
+            admin_comment=f"created_by_admin:{message.from_user.id}",
+        )
+        await state.clear()
+        await message.answer(
+            f"Закрытый день добавлен: {restriction_date:%d.%m.%Y}.",
+            reply_markup=admin_menu_keyboard(),
+        )
+
+    @router.callback_query(F.data.startswith("adm:restriction_delete:"))
+    async def restriction_delete_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        if deps.admin_settings is None:
+            await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
+            return
+        restriction_id = UUID((callback.data or "").removeprefix("adm:restriction_delete:"))
+        deleted = await deps.admin_settings.delete_restriction(restriction_id)
+        await callback.answer("Удалено" if deleted else messages.ACTION_UNAVAILABLE)
+        await _show_restrictions(callback, deps)
+
+    @router.callback_query(F.data == "adm:meeting_types")
+    async def meeting_types_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        await callback.answer()
+        await _show_meeting_types(callback, deps)
+
+    @router.callback_query(F.data == "adm:meeting_type_add")
+    async def meeting_type_add_callback(callback: CallbackQuery, state: FSMContext) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        if deps.admin_settings is None:
+            await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
+            return
+        await state.set_state(AdminStates.meeting_type_name)
+        await callback.answer()
+        await _answer(callback, "Введите название нового типа встречи.")
+
+    @router.message(AdminStates.meeting_type_name)
+    async def meeting_type_name_message(message: Message, state: FSMContext) -> None:
+        if not await _ensure_admin_message(message, deps):
+            return
+        name = (message.text or "").strip()
+        if not name or len(name) > 255:
+            await message.answer("Название должно быть от 1 до 255 символов.")
+            return
+        await state.update_data(meeting_type_name=name)
+        await state.set_state(AdminStates.meeting_type_durations)
+        await message.answer("Введите длительности через запятую: 30, 60 или 90.")
+
+    @router.message(AdminStates.meeting_type_durations)
+    async def meeting_type_durations_message(message: Message, state: FSMContext) -> None:
+        if not await _ensure_admin_message(message, deps):
+            return
+        if deps.admin_settings is None:
+            await message.answer(messages.ACTION_UNAVAILABLE)
+            await state.clear()
+            return
+        durations = _parse_meeting_type_durations(message.text or "")
+        if durations is None:
+            await message.answer("Длительности должны быть числами 30, 60 или 90 через запятую.")
+            return
+        data = await state.get_data()
+        added = await deps.admin_settings.add_meeting_type(
+            name=data["meeting_type_name"],
+            allowed_durations_minutes=durations,
+            is_fixed_duration=len(durations) == 1,
+        )
+        await state.clear()
+        if added is None:
+            await message.answer(
+                "Тип встречи с таким названием уже есть.",
+                reply_markup=admin_menu_keyboard(),
+            )
+            return
+        await message.answer(
+            f"Тип встречи добавлен: {added.name}.",
+            reply_markup=admin_menu_keyboard(),
+        )
+
+    @router.callback_query(F.data.startswith("adm:meeting_type_toggle:"))
+    async def meeting_type_toggle_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        if deps.admin_settings is None:
+            await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
+            return
+        raw_id, raw_active = (callback.data or "").removeprefix(
+            "adm:meeting_type_toggle:"
+        ).rsplit(":", 1)
+        updated = await deps.admin_settings.set_meeting_type_active(
+            UUID(raw_id),
+            is_active=raw_active == "1",
+        )
+        await callback.answer("Обновлено" if updated else messages.ACTION_UNAVAILABLE)
+        await _show_meeting_types(callback, deps)
+
+    @router.callback_query(F.data == "adm:filters")
+    async def filters_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        await callback.answer()
+        await _answer(callback, "Выберите статус заявок.", reply_markup=booking_filters_keyboard())
+
+    @router.callback_query(F.data.startswith("adm:filter:"))
+    async def filter_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        raw_status = (callback.data or "").removeprefix("adm:filter:")
+        try:
+            status = BookingStatus(raw_status)
+        except ValueError:
+            await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
+            return
+        bookings = [
+            booking for booking in await deps.bookings.list_all() if booking.status == status
+        ]
+        await callback.answer()
+        await _show_bookings(
+            callback,
+            bookings,
+            empty_text=f"Заявок со статусом «{booking_status_label(status)}» нет.",
+        )
+
     return router
+
+
+async def _show_restrictions(callback: CallbackQuery, deps: AdminFlowDependencies) -> None:
+    if deps.admin_settings is None:
+        await _answer(
+            callback,
+            messages.ACTION_UNAVAILABLE,
+            reply_markup=back_to_admin_menu_keyboard(),
+        )
+        return
+    restrictions = await deps.admin_settings.list_upcoming_restrictions(
+        from_date=deps.clock().date()
+    )
+    lines = ["Ограничения расписания:"]
+    if restrictions:
+        for restriction in restrictions:
+            if restriction.restriction_type == "closed_day":
+                title = f"{restriction.restriction_date:%d.%m.%Y}: закрытый день"
+            else:
+                title = (
+                    f"{restriction.restriction_date:%d.%m.%Y}: "
+                    f"{restriction.start_time or '-'}-{restriction.end_time or '-'}"
+                )
+            if restriction.admin_comment:
+                title = f"{title} ({restriction.admin_comment})"
+            lines.append(title)
+    else:
+        lines.append("Будущих ограничений нет.")
+    await _answer(
+        callback,
+        "\n".join(lines),
+        reply_markup=restrictions_keyboard(restrictions),
+    )
+
+
+async def _show_meeting_types(callback: CallbackQuery, deps: AdminFlowDependencies) -> None:
+    if deps.admin_settings is None:
+        await _answer(
+            callback,
+            messages.ACTION_UNAVAILABLE,
+            reply_markup=back_to_admin_menu_keyboard(),
+        )
+        return
+    meeting_types = await deps.admin_settings.list_meeting_types_admin()
+    lines = ["Типы встреч:"]
+    for meeting_type in meeting_types:
+        status = "активен" if meeting_type.is_active else "отключен"
+        fixed = ", фиксированная длительность" if meeting_type.is_fixed_duration else ""
+        durations = "/".join(str(item) for item in meeting_type.allowed_durations_minutes)
+        lines.append(f"{meeting_type.name}: {status}, {durations} мин{fixed}")
+    await _answer(
+        callback,
+        "\n".join(lines),
+        reply_markup=meeting_types_admin_keyboard(meeting_types),
+    )
 
 
 async def _show_bookings(
@@ -338,6 +559,41 @@ async def _show_bookings(
         await _answer(callback, empty_text, reply_markup=back_to_admin_menu_keyboard())
         return
     await _answer(callback, "Заявки:", reply_markup=admin_bookings_keyboard(bookings))
+
+
+def _schedule_text(
+    settings: AdminScheduleSettings,
+    working_hours: list[AdminWorkingHoursRule],
+) -> str:
+    lines = [
+        "Расписание:",
+        f"Часовой пояс: {settings.timezone}",
+        f"Минимальный срок записи: {settings.min_booking_lead_days} дн.",
+        f"Горизонт записи: {settings.booking_horizon_days} дн.",
+        f"Шаг слотов: {settings.slot_step_minutes} мин.",
+        f"Буфер вокруг встреч: {settings.meeting_buffer_minutes} мин.",
+        "",
+        "Рабочие часы:",
+    ]
+    names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+    for rule in working_hours:
+        if rule.is_working_day and rule.start_time and rule.end_time:
+            lines.append(f"{names[rule.weekday]}: {rule.start_time:%H:%M}-{rule.end_time:%H:%M}")
+        else:
+            lines.append(f"{names[rule.weekday]}: выходной")
+    return "\n".join(lines)
+
+
+def _parse_meeting_type_durations(raw_value: str) -> tuple[int, ...] | None:
+    try:
+        durations = tuple(
+            sorted({int(item.strip()) for item in raw_value.split(",") if item.strip()})
+        )
+    except ValueError:
+        return None
+    if not durations or any(item not in {30, 60, 90} for item in durations):
+        return None
+    return durations
 
 
 async def _confirm_booking(
@@ -552,7 +808,7 @@ def _booking_card_text(card: AdminBookingCard) -> str:
             f"Дата: {booking.starts_at:%d.%m.%Y}",
             f"Время: {booking.starts_at:%H:%M}",
             f"Комментарий: {comment}",
-            f"Статус: {booking.status.value}",
+            f"Статус: {booking_status_label(booking.status)}",
             f"Резерв до: {reserved_until}",
         ]
     )

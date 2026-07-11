@@ -314,7 +314,7 @@ def seed_initial_data() -> None:
                 "timezone": "Europe/Moscow",
                 "min_booking_lead_days": 1,
                 "booking_horizon_days": 30,
-                "slot_step_minutes": 30,
+                "slot_step_minutes": 60,
                 "meeting_buffer_minutes": 90,
                 "daily_meeting_limit": None,
                 "default_meeting_url": "https://telemost.yandex.ru/j/75500242705811",

@@ -13,7 +13,7 @@ class ScheduleSettings(UuidPrimaryKeyMixin, TimestampMixin, Base):
     timezone: Mapped[str] = mapped_column(String(100), default="Europe/Moscow", nullable=False)
     min_booking_lead_days: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     booking_horizon_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
-    slot_step_minutes: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    slot_step_minutes: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
     meeting_buffer_minutes: Mapped[int] = mapped_column(Integer, default=90, nullable=False)
     daily_meeting_limit: Mapped[int | None] = mapped_column(Integer)
     default_meeting_url: Mapped[str | None] = mapped_column(String(2048))

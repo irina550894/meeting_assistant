@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     default_meeting_url: str | None = None
     booking_horizon_days: int = 30
     min_booking_lead_days: int = 1
-    slot_step_minutes: int = 30
+    slot_step_minutes: int = 60
     meeting_buffer_minutes: int = 90
     pending_booking_ttl_hours: int = 48
     cancellation_deadline_hours: int = 2

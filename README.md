@@ -69,6 +69,14 @@ TELEGRAM_STORAGE=postgres
 If `TELEGRAM_STORAGE` is omitted or set to `memory`, polling uses in-memory storage. That
 mode is useful for quick checks, but data is lost when the process stops.
 
+Admin sections available in local polling:
+
+- `/admin` opens pending bookings, all bookings and blocked users.
+- `Расписание` shows schedule settings and working hours.
+- `Ограничения` shows upcoming restrictions and can add/delete a closed day.
+- `Типы встреч` shows meeting types, can add a new meeting type and can enable/disable them.
+- `Фильтры заявок` shows bookings by status with Russian status labels.
+
 Required `.env` values for local Telegram check:
 
 ```dotenv

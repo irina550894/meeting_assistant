@@ -11,6 +11,7 @@ from aiogram.types import (
 
 from app.core.booking import BookingRecord, BookingStatus, MeetingType
 from app.core.scheduling import AvailableSlot
+from app.integrations.telegram.status_labels import booking_status_label
 
 BACK = "Назад"
 CANCEL = "Отмена"
@@ -155,7 +156,7 @@ def bookings_keyboard(bookings: Iterable[BookingRecord]) -> InlineKeyboardMarkup
     rows = [
         [
             InlineKeyboardButton(
-                text=f"{booking.starts_at:%d.%m %H:%M} - {booking.status.value}",
+                text=f"{booking.starts_at:%d.%m %H:%M} - {booking_status_label(booking.status)}",
                 callback_data=f"uf:booking:{booking.id}",
             )
         ]

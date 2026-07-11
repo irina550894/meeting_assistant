@@ -5,3 +5,6 @@ class AdminStates(StatesGroup):
     custom_meeting_url = State()
     rejection_reason = State()
     user_message = State()
+    closed_day_date = State()
+    meeting_type_name = State()
+    meeting_type_durations = State()

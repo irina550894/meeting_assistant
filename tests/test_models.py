@@ -1,6 +1,5 @@
 from app.persistence.models import Base
 
-
 EXPECTED_TABLES = {
     "audit_logs",
     "background_jobs",

@@ -16,7 +16,6 @@ from app.integrations.google_calendar import GoogleCalendarClient, GoogleCalenda
 from app.integrations.google_calendar.entities import GoogleOAuthTokens
 from app.settings.config import Settings
 
-
 MOSCOW = ZoneInfo("Europe/Moscow")
 
 

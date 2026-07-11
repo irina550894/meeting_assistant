@@ -14,10 +14,18 @@ from app.core.booking import (
 from app.core.scheduling import (
     BusyInterval,
     BusySource,
+    RestrictionType,
+    ScheduleRestriction,
     ScheduleSettings,
     WorkingHoursRule,
 )
 from app.core.user_flow import FlowScheduleContext
+from app.integrations.telegram.ports import (
+    AdminMeetingType,
+    AdminScheduleRestriction,
+    AdminScheduleSettings,
+    AdminWorkingHoursRule,
+)
 from app.settings.config import Settings
 
 
@@ -29,6 +37,7 @@ class InMemoryRuntimeStore:
         self.bookings: dict[UUID, BookingRecord] = {}
         self.audit_entries: list[AuditEntry] = []
         self.meeting_types: dict[UUID, MeetingType] = {}
+        self.restrictions: dict[UUID, AdminScheduleRestriction] = {}
         self._seed_meeting_types()
 
     async def get_by_telegram_id(self, telegram_id: int) -> UserProfile | None:
@@ -97,9 +106,117 @@ class InMemoryRuntimeStore:
                 meeting_buffer_minutes=self.settings.meeting_buffer_minutes,
             ),
             working_hours=self._default_working_hours(),
-            restrictions=[],
+            restrictions=[
+                ScheduleRestriction(
+                    restriction_date=restriction.restriction_date,
+                    restriction_type=RestrictionType(restriction.restriction_type),
+                    start_time=restriction.start_time,
+                    end_time=restriction.end_time,
+                )
+                for restriction in self.restrictions.values()
+                if restriction.restriction_date == target_date
+            ],
             busy_intervals=self._busy_intervals_for_date(target_date),
         )
+
+    async def get_schedule_settings(self) -> AdminScheduleSettings:
+        return AdminScheduleSettings(
+            timezone=self.settings.app_timezone,
+            min_booking_lead_days=self.settings.min_booking_lead_days,
+            booking_horizon_days=self.settings.booking_horizon_days,
+            slot_step_minutes=self.settings.slot_step_minutes,
+            meeting_buffer_minutes=self.settings.meeting_buffer_minutes,
+        )
+
+    async def list_working_hours(self) -> list[AdminWorkingHoursRule]:
+        return [
+            AdminWorkingHoursRule(
+                weekday=rule.weekday,
+                is_working_day=rule.is_working_day,
+                start_time=rule.start_time,
+                end_time=rule.end_time,
+            )
+            for rule in self._default_working_hours()
+        ]
+
+    async def list_upcoming_restrictions(
+        self,
+        *,
+        from_date: date,
+    ) -> list[AdminScheduleRestriction]:
+        return sorted(
+            [
+                restriction
+                for restriction in self.restrictions.values()
+                if restriction.restriction_date >= from_date
+            ],
+            key=lambda restriction: restriction.restriction_date,
+        )
+
+    async def add_closed_day_restriction(
+        self,
+        *,
+        restriction_date: date,
+        admin_comment: str | None,
+    ) -> None:
+        restriction = AdminScheduleRestriction(
+            id=UUID(int=len(self.restrictions) + 1),
+            restriction_date=restriction_date,
+            restriction_type="closed_day",
+            admin_comment=admin_comment,
+        )
+        self.restrictions[restriction.id] = restriction
+
+    async def delete_restriction(self, restriction_id: UUID) -> bool:
+        return self.restrictions.pop(restriction_id, None) is not None
+
+    async def list_meeting_types_admin(self) -> list[AdminMeetingType]:
+        return [
+            AdminMeetingType(
+                id=meeting_type.id,
+                name=meeting_type.name,
+                allowed_durations_minutes=meeting_type.allowed_durations_minutes,
+                is_fixed_duration=meeting_type.is_fixed_duration,
+                is_active=meeting_type.is_active,
+            )
+            for meeting_type in sorted(self.meeting_types.values(), key=lambda item: item.name)
+        ]
+
+    async def add_meeting_type(
+        self,
+        *,
+        name: str,
+        allowed_durations_minutes: tuple[int, ...],
+        is_fixed_duration: bool,
+    ) -> AdminMeetingType | None:
+        if any(item.name == name for item in self.meeting_types.values()):
+            return None
+        meeting_type = MeetingType(
+            name=name,
+            allowed_durations_minutes=allowed_durations_minutes,
+            is_fixed_duration=is_fixed_duration,
+        )
+        self.meeting_types[meeting_type.id] = meeting_type
+        return AdminMeetingType(
+            id=meeting_type.id,
+            name=meeting_type.name,
+            allowed_durations_minutes=meeting_type.allowed_durations_minutes,
+            is_fixed_duration=meeting_type.is_fixed_duration,
+            is_active=meeting_type.is_active,
+        )
+
+    async def set_meeting_type_active(self, meeting_type_id: UUID, *, is_active: bool) -> bool:
+        meeting_type = self.meeting_types.get(meeting_type_id)
+        if meeting_type is None:
+            return False
+        self.meeting_types[meeting_type_id] = MeetingType(
+            id=meeting_type.id,
+            name=meeting_type.name,
+            allowed_durations_minutes=meeting_type.allowed_durations_minutes,
+            is_fixed_duration=meeting_type.is_fixed_duration,
+            is_active=is_active,
+        )
+        return True
 
     def _seed_meeting_types(self) -> None:
         consultation = MeetingType(

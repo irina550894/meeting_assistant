@@ -1,9 +1,12 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 from app.core.booking import BookingStatus
 from app.persistence.models import Booking, MeetingType, SlotReservation, User
+from app.persistence.models import ScheduleRestriction as ScheduleRestrictionModel
 from app.persistence.repositories.telegram_runtime import (
+    _admin_meeting_type,
+    _admin_restriction,
     _booking_record,
     _default_working_hours_rules,
     _mark_previous_booking_reschedule_requested,
@@ -84,6 +87,39 @@ def test_runtime_store_maps_meeting_type_duration_rules() -> None:
 
     assert record.allowed_durations_minutes == (30, 60, 90)
     assert record.is_active is True
+
+
+def test_runtime_store_maps_admin_meeting_type() -> None:
+    meeting_type = MeetingType(
+        id=uuid4(),
+        name="Diagnostics",
+        slug="diagnostics",
+        allowed_durations_minutes=[60],
+        is_fixed_duration=True,
+        is_active=False,
+    )
+
+    record = _admin_meeting_type(meeting_type)
+
+    assert record.name == "Diagnostics"
+    assert record.allowed_durations_minutes == (60,)
+    assert record.is_fixed_duration is True
+    assert record.is_active is False
+
+
+def test_runtime_store_maps_admin_restriction() -> None:
+    restriction = ScheduleRestrictionModel(
+        id=uuid4(),
+        restriction_type="closed_day",
+        restriction_date=date(2026, 7, 13),
+        admin_comment="manual",
+    )
+
+    record = _admin_restriction(restriction)
+
+    assert record.restriction_date == date(2026, 7, 13)
+    assert record.restriction_type == "closed_day"
+    assert record.admin_comment == "manual"
 
 
 def test_runtime_store_maps_reservation_model() -> None:

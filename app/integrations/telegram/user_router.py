@@ -30,6 +30,7 @@ from app.integrations.telegram.keyboards import (
 )
 from app.integrations.telegram.ports import UserFlowDependencies
 from app.integrations.telegram.states import UserBookingStates
+from app.integrations.telegram.status_labels import booking_status_label
 from app.logging.config import get_logger
 
 logger = get_logger(__name__)
@@ -732,5 +733,5 @@ def _booking_text(booking: BookingRecord) -> str:
 def _booking_summary(booking: BookingRecord) -> str:
     return (
         f"{booking.starts_at:%d.%m.%Y %H:%M}, "
-        f"{booking.duration_minutes} минут, {booking.status.value}"
+        f"{booking.duration_minutes} минут, {booking_status_label(booking.status)}"
     )
