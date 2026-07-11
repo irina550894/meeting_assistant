@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     telegram_admin_id: int | None = None
     telegram_use_webhook: bool = False
     telegram_request_timeout_seconds: int = 10
+    telegram_storage: str = "memory"
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -96,6 +97,7 @@ class Settings(BaseSettings):
             "app_timezone": self.app_timezone,
             "telegram_admin_id_configured": self.telegram_admin_id is not None,
             "telegram_bot_token_configured": self.telegram_bot_token is not None,
+            "telegram_storage": self.telegram_storage,
             "database_configured": bool(self.database_url),
             "google_oauth_configured": bool(
                 self.google_oauth_client_id and self.google_oauth_client_secret

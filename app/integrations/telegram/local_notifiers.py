@@ -1,12 +1,18 @@
+from typing import Protocol
+from uuid import UUID
+
 from aiogram import Bot
 
 from app.core.booking import BookingRecord, UserProfile
 from app.integrations.telegram.admin_keyboards import admin_booking_actions_keyboard
-from app.integrations.telegram.local_memory import InMemoryRuntimeStore
 from app.logging.config import get_logger
 from app.settings.config import Settings
 
 logger = get_logger(__name__)
+
+
+class UserLookupStore(Protocol):
+    async def get(self, entity_id: UUID) -> object | None: ...
 
 
 class TelegramUserFlowNotifier:
@@ -48,7 +54,7 @@ class TelegramUserFlowNotifier:
 
 
 class TelegramAdminNotifier:
-    def __init__(self, *, bot: Bot, store: InMemoryRuntimeStore) -> None:
+    def __init__(self, *, bot: Bot, store: UserLookupStore) -> None:
         self.bot = bot
         self.store = store
 

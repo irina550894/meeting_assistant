@@ -16,10 +16,24 @@ pip install -e ".[dev]"
 ```
 
 3. Fill local `.env` values. Do not commit `.env`.
-4. Start PostgreSQL:
+4. For the current local stages 8-9, use a locally installed PostgreSQL 16 on Windows.
+   Do not use Docker on a low-RAM local machine. After PostgreSQL is installed, apply
+   migrations. To configure local database credentials without printing the password:
 
 ```powershell
-docker compose up -d postgres
+.\.venv\Scripts\python.exe scripts\configure_local_postgres_env.py
+```
+
+Apply migrations:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Check local database and worker diagnostics:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\check_local_runtime.py
 ```
 
 5. Run the API:
@@ -37,18 +51,23 @@ http://127.0.0.1:8000/health
 7. Run worker stub:
 
 ```powershell
-python -m app.worker.main
+.\.venv\Scripts\python.exe -m app.worker.main
 ```
 
 8. Run the local Telegram bot polling mode for manual checks:
 
 ```powershell
-python -m app.integrations.telegram.run_polling
+.\.venv\Scripts\python.exe -m app.integrations.telegram.run_polling
 ```
 
-Local polling mode uses in-memory storage. It is useful for checking `/start`, consent,
-booking creation, "My bookings", cancellation, and admin actions in Telegram. Data is lost
-when the process stops.
+Local polling can use persistent PostgreSQL storage:
+
+```dotenv
+TELEGRAM_STORAGE=postgres
+```
+
+If `TELEGRAM_STORAGE` is omitted or set to `memory`, polling uses in-memory storage. That
+mode is useful for quick checks, but data is lost when the process stops.
 
 Required `.env` values for local Telegram check:
 

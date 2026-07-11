@@ -32,6 +32,10 @@ from app.integrations.telegram.ports import AdminFlowDependencies, UserFlowDepen
 from app.integrations.telegram.user_router import create_user_router
 from app.logging.config import configure_logging, get_logger
 from app.persistence.database import AsyncSessionFactory
+from app.persistence.repositories import (
+    CommittedBackgroundJobScheduler,
+    SqlAlchemyTelegramRuntimeStore,
+)
 from app.settings.config import get_settings
 
 logger = get_logger(__name__)
@@ -53,7 +57,21 @@ async def run_local_polling() -> None:
         session=AiohttpSession(timeout=settings.telegram_request_timeout_seconds),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    store = InMemoryRuntimeStore(settings)
+    storage = settings.telegram_storage.strip().lower()
+    if storage == "postgres":
+        store = SqlAlchemyTelegramRuntimeStore(
+            session_factory=AsyncSessionFactory,
+            settings=settings,
+        )
+        await store.ensure_seed_data()
+        background_jobs = CommittedBackgroundJobScheduler(
+            session_factory=AsyncSessionFactory,
+            settings=settings,
+        )
+    else:
+        store = InMemoryRuntimeStore(settings)
+        storage = "in_memory"
+        background_jobs = None
     booking_service = BookingService(
         max_active_bookings_per_user=settings.max_active_bookings_per_user,
         pending_booking_ttl=timedelta(hours=settings.pending_booking_ttl_hours),
@@ -88,6 +106,7 @@ async def run_local_polling() -> None:
         clock=clock,
         notifier=TelegramUserFlowNotifier(bot=bot, settings=settings),
         calendar_events=event_gateway,
+        background_jobs=background_jobs,
     )
     admin_deps = AdminFlowDependencies(
         settings=settings,
@@ -98,6 +117,7 @@ async def run_local_polling() -> None:
         calendar=confirmation_gateway,
         clock=clock,
         notifier=TelegramAdminNotifier(bot=bot, store=store),
+        background_jobs=background_jobs,
         diagnostics=DiagnosticsService(
             settings,
             session_factory=AsyncSessionFactory,
@@ -116,7 +136,7 @@ async def run_local_polling() -> None:
         extra={
             "event": "telegram_polling_started",
             "admin_configured": settings.telegram_admin_id is not None,
-            "storage": "in_memory",
+            "storage": storage,
         },
     )
     try:

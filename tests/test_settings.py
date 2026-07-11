@@ -17,3 +17,10 @@ def test_settings_safe_summary_does_not_expose_secrets() -> None:
     assert "secret-token" not in str(summary)
     assert summary["telegram_bot_token_configured"] is True
     assert summary["telegram_admin_id_configured"] is True
+
+
+def test_settings_expose_storage_mode_without_secrets() -> None:
+    settings = Settings(telegram_storage="postgres")
+
+    assert settings.telegram_storage == "postgres"
+    assert settings.safe_summary["telegram_storage"] == "postgres"

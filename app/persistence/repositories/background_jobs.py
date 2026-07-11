@@ -14,8 +14,43 @@ from app.persistence.models.enums import (
     BackgroundJobStatus,
     BookingStatus,
 )
+from app.settings.config import Settings
 from app.worker.jobs import BackgroundJobRecord, ReminderBooking
-from app.worker.scheduler import BackgroundJobScheduleRequest
+from app.worker.scheduler import BackgroundJobScheduler, BackgroundJobScheduleRequest
+
+
+class CommittedBackgroundJobScheduler:
+    def __init__(self, *, session_factory, settings: Settings) -> None:
+        self.session_factory = session_factory
+        self.settings = settings
+
+    async def schedule_booking_created(
+        self,
+        booking: BookingRecord,
+        *,
+        now: datetime,
+    ) -> None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                scheduler = BackgroundJobScheduler(
+                    repository=SqlAlchemyBackgroundJobRepository(session),
+                    settings=self.settings,
+                )
+                await scheduler.schedule_booking_created(booking, now=now)
+
+    async def schedule_booking_confirmed(
+        self,
+        booking: BookingRecord,
+        *,
+        now: datetime,
+    ) -> None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                scheduler = BackgroundJobScheduler(
+                    repository=SqlAlchemyBackgroundJobRepository(session),
+                    settings=self.settings,
+                )
+                await scheduler.schedule_booking_confirmed(booking, now=now)
 
 
 class SqlAlchemyBackgroundJobRepository:

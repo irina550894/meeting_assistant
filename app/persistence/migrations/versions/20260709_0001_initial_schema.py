@@ -63,7 +63,10 @@ def upgrade() -> None:
         sa.Column("is_fixed_duration", sa.Boolean(), nullable=False),
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         *timestamp_columns(),
-        sa.CheckConstraint("array_length(allowed_durations_minutes, 1) > 0"),
+        sa.CheckConstraint(
+            "array_length(allowed_durations_minutes, 1) > 0",
+            name="durations_not_empty",
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
         sa.UniqueConstraint("slug"),
@@ -93,8 +96,8 @@ def upgrade() -> None:
         sa.Column("end_time", sa.Time(), nullable=True),
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         *timestamp_columns(),
-        sa.CheckConstraint("weekday between 0 and 6"),
-        sa.CheckConstraint("start_time < end_time"),
+        sa.CheckConstraint("weekday between 0 and 6", name="valid_weekday"),
+        sa.CheckConstraint("start_time < end_time", name="valid_working_hours_range"),
         sa.PrimaryKeyConstraint("id"),
     )
 
@@ -107,8 +110,14 @@ def upgrade() -> None:
         sa.Column("admin_comment", sa.Text(), nullable=True),
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         *timestamp_columns(),
-        sa.CheckConstraint("restriction_type in ('closed_day', 'time_interval')"),
-        sa.CheckConstraint("start_time is null or end_time is null or start_time < end_time"),
+        sa.CheckConstraint(
+            "restriction_type in ('closed_day', 'time_interval')",
+            name="valid_restriction_type",
+        ),
+        sa.CheckConstraint(
+            "start_time is null or end_time is null or start_time < end_time",
+            name="valid_restriction_range",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -135,8 +144,8 @@ def upgrade() -> None:
         sa.Column("previous_booking_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         *timestamp_columns(),
-        sa.CheckConstraint("duration_minutes in (30, 60, 90)"),
-        sa.CheckConstraint("starts_at < ends_at"),
+        sa.CheckConstraint("duration_minutes in (30, 60, 90)", name="valid_duration_minutes"),
+        sa.CheckConstraint("starts_at < ends_at", name="valid_time_range"),
         sa.ForeignKeyConstraint(["meeting_type_id"], ["meeting_types.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["previous_booking_id"], ["bookings.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
@@ -156,7 +165,7 @@ def upgrade() -> None:
         sa.Column("released_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         *timestamp_columns(),
-        sa.CheckConstraint("starts_at < ends_at"),
+        sa.CheckConstraint("starts_at < ends_at", name="valid_reservation_range"),
         sa.ForeignKeyConstraint(["booking_id"], ["bookings.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("booking_id"),
