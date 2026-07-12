@@ -37,6 +37,22 @@ Build and start:
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
+If the VPS already has a system Caddy listening on ports `80` and `443`, do not start
+the `caddy` container. Use the override file and start only `postgres`, `app` and `worker`:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.system-caddy.yml --env-file .env.production up -d --build postgres app worker
+```
+
+Then add this block to the existing `/etc/caddy/Caddyfile` and reload Caddy:
+
+```caddyfile
+calendar.finforbiz.pro {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:8010
+}
+```
+
 Show containers:
 
 ```bash
@@ -95,3 +111,5 @@ Then write `/start` to the Telegram bot.
   the Docker network.
 - The app installs Telegram webhook on startup when `TELEGRAM_USE_WEBHOOK=true`.
 - Caddy obtains HTTPS certificates automatically after DNS points to the VPS.
+- On the current VPS, a system Caddy is already used for other services, so the deployed
+  setup uses `docker-compose.system-caddy.yml` and does not run the `caddy` container.
