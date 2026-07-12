@@ -101,7 +101,12 @@ def test_google_calendar_create_event_contains_mvp_fields() -> None:
     service = FakeCalendarService()
     client = _client(service)
     booking = _booking()
-    user = UserProfile(telegram_id=1001, full_name="Ирина", email="client@example.com")
+    user = UserProfile(
+        telegram_id=1001,
+        telegram_username="client_user",
+        full_name="Ирина",
+        email="client@example.com",
+    )
     meeting_type = MeetingType(name="Консультация", allowed_durations_minutes=(30, 60))
 
     event_id = client.create_event(
@@ -118,7 +123,14 @@ def test_google_calendar_create_event_contains_mvp_fields() -> None:
     assert body["location"] == "https://telemost.example/meeting"
     assert {"email": "client@example.com"} in body["attendees"]
     assert {"email": "admin@example.com"} in body["attendees"]
-    assert "https://telemost.example/meeting" in body["description"]
+    assert "Имя: Ирина" in body["description"]
+    assert "Telegram: @client_user" in body["description"]
+    assert "Email: client@example.com" in body["description"]
+    assert "Тип встречи: Консультация" in body["description"]
+    assert "Длительность: 30 минут" in body["description"]
+    assert "Дата и время: 10.07.2026 12:00 МСК" in body["description"]
+    assert "Комментарий: Обсудить проект" in body["description"]
+    assert "Ссылка на видеовстречу: https://telemost.example/meeting" in body["description"]
     assert body["reminders"]["overrides"] == [
         {"method": "email", "minutes": 1440},
         {"method": "popup", "minutes": 60},

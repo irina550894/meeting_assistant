@@ -4,7 +4,7 @@ from uuid import UUID
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.booking import BookingRecord, BookingStatus, UserProfile
-from app.integrations.telegram.formatting import format_datetime_msk
+from app.core.datetime_formatting import format_datetime_msk
 from app.integrations.telegram.ports import AdminMeetingType, AdminScheduleRestriction
 from app.integrations.telegram.status_labels import booking_status_label
 

@@ -203,6 +203,7 @@ class AdminFlowDependencies:
     calendar: CalendarConfirmationGateway
     clock: Callable[[], datetime]
     notifier: AdminNotifier | None = None
+    calendar_events: CalendarEventGateway | None = None
     background_jobs: BackgroundJobSchedulerPort | None = None
     diagnostics: DiagnosticsProvider | None = None
     admin_settings: AdminSettingsStore | None = None

@@ -272,6 +272,35 @@ class BookingService:
             payload={"reason": reason},
         )
 
+    def complete_reschedule(
+        self,
+        previous_booking: BookingRecord,
+        *,
+        now: datetime,
+        new_booking_id: str,
+    ) -> AuditEntry:
+        if previous_booking.status != BookingStatus.RESCHEDULE_REQUESTED:
+            self._raise_rule(
+                "booking_not_reschedule_requested",
+                "Only reschedule-requested bookings can be completed.",
+            )
+
+        self._release_reservation(previous_booking, now)
+        self._change_status(
+            previous_booking,
+            BookingStatus.RESCHEDULED,
+            now=now,
+            reason="reschedule_confirmed",
+        )
+        return self._audit(
+            actor_type="system",
+            action="booking_rescheduled",
+            entity_type="booking",
+            entity_id=previous_booking.id,
+            created_at=now,
+            payload={"new_booking_id": new_booking_id},
+        )
+
     def cancel_booking_by_user(
         self,
         booking: BookingRecord,

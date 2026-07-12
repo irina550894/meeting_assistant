@@ -10,12 +10,12 @@ from aiogram.types import (
 )
 
 from app.core.booking import BookingRecord, BookingStatus, MeetingType
-from app.core.scheduling import AvailableSlot
-from app.integrations.telegram.formatting import (
+from app.core.datetime_formatting import (
     format_date_with_weekday,
     format_datetime_msk,
     format_time_msk,
 )
+from app.core.scheduling import AvailableSlot
 from app.integrations.telegram.status_labels import booking_status_label
 
 BACK = "Назад"

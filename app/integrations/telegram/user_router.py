@@ -8,10 +8,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from app.core.booking import BookingRecord, BusinessRuleError, MeetingType, UserProfile
+from app.core.datetime_formatting import format_datetime_msk
 from app.core.user_flow import BookingDraft, UserFlowError
 from app.integrations.google_calendar import GoogleCalendarError
 from app.integrations.telegram import messages
-from app.integrations.telegram.formatting import format_datetime_msk
 from app.integrations.telegram.keyboards import (
     BACK,
     CANCEL,

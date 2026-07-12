@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiogram import Bot
 
-from app.integrations.telegram.formatting import format_datetime_msk
+from app.core.datetime_formatting import format_datetime_msk
 from app.logging.config import get_logger
 from app.worker.jobs import ReminderBooking
 

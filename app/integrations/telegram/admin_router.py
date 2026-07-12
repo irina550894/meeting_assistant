@@ -7,7 +7,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.core.admin_flow import AdminBookingCard, AdminFlowError
-from app.core.booking import BookingRecord, BookingStatus, BusinessRuleError
+from app.core.booking import AuditEntry, BookingRecord, BookingStatus, BusinessRuleError
+from app.core.datetime_formatting import format_datetime_msk
 from app.integrations.google_calendar import GoogleCalendarError, GoogleCalendarNotConnectedError
 from app.integrations.telegram import admin_messages as messages
 from app.integrations.telegram.admin_keyboards import (
@@ -24,7 +25,6 @@ from app.integrations.telegram.admin_keyboards import (
     restrictions_keyboard,
 )
 from app.integrations.telegram.admin_states import AdminStates
-from app.integrations.telegram.formatting import format_datetime_msk
 from app.integrations.telegram.ports import (
     AdminFlowDependencies,
     AdminScheduleSettings,
@@ -221,6 +221,11 @@ def create_admin_router(deps: AdminFlowDependencies) -> Router:
         )
         await deps.users.save(user)
         for booking in result.closed_bookings:
+            await _cancel_calendar_event_if_needed(
+                deps,
+                booking,
+                operation="admin_block_user",
+            )
             await deps.bookings.save_booking(booking)
         await deps.bookings.save_audit_entries(result.audit_entries)
         if deps.notifier:
@@ -633,7 +638,11 @@ async def _confirm_booking(
         await callback.answer(messages.GOOGLE_CALENDAR_ERROR, show_alert=True)
         return
     await deps.bookings.save_booking(card.booking)
-    await deps.bookings.save_audit_entries([audit])
+    audit_entries = [audit]
+    reschedule_audit = await _complete_previous_reschedule_if_needed(card.booking, deps)
+    if reschedule_audit:
+        audit_entries.append(reschedule_audit)
+    await deps.bookings.save_audit_entries(audit_entries)
     if deps.background_jobs:
         await deps.background_jobs.schedule_booking_confirmed(card.booking, now=deps.clock())
     if deps.notifier:
@@ -681,7 +690,11 @@ async def _confirm_booking_message(
         await message.answer(messages.GOOGLE_CALENDAR_ERROR)
         return
     await deps.bookings.save_booking(card.booking)
-    await deps.bookings.save_audit_entries([audit])
+    audit_entries = [audit]
+    reschedule_audit = await _complete_previous_reschedule_if_needed(card.booking, deps)
+    if reschedule_audit:
+        audit_entries.append(reschedule_audit)
+    await deps.bookings.save_audit_entries(audit_entries)
     if deps.background_jobs:
         await deps.background_jobs.schedule_booking_confirmed(card.booking, now=deps.clock())
     if deps.notifier:
@@ -762,6 +775,53 @@ async def _booking_card(
         user=user,
         meeting_type=meeting_type,
     )
+
+
+async def _complete_previous_reschedule_if_needed(
+    booking: BookingRecord,
+    deps: AdminFlowDependencies,
+) -> AuditEntry | None:
+    if not booking.is_reschedule_request or not booking.previous_booking_id:
+        return None
+    previous = await deps.bookings.get(booking.previous_booking_id)
+    if not previous:
+        return None
+
+    await _cancel_calendar_event_if_needed(
+        deps,
+        previous,
+        operation="admin_confirm_reschedule",
+    )
+    audit = deps.admin_flow.complete_reschedule(
+        previous_booking=previous,
+        new_booking=booking,
+        now=deps.clock(),
+    )
+    await deps.bookings.save_booking(previous)
+    return audit
+
+
+async def _cancel_calendar_event_if_needed(
+    deps: AdminFlowDependencies,
+    booking: BookingRecord,
+    *,
+    operation: str,
+) -> None:
+    if not deps.calendar_events or not booking.google_calendar_event_id:
+        return
+    try:
+        await deps.calendar_events.cancel_event(booking.google_calendar_event_id)
+    except GoogleCalendarError as error:
+        logger.warning(
+            "Google Calendar event cancellation failed",
+            extra={
+                "event": "google_api_error",
+                "operation": operation,
+                "booking_id": str(booking.id),
+                "error_code": error.code,
+                "error_type": type(error).__name__,
+            },
+        )
 
 
 async def _ensure_admin_message(message: Message, deps: AdminFlowDependencies) -> bool:

@@ -6,6 +6,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from app.core.booking import BookingRecord, MeetingType, UserProfile
+from app.core.datetime_formatting import format_datetime_msk
 from app.core.scheduling import BusyInterval, BusySource
 from app.integrations.google_calendar.entities import GoogleOAuthTokens
 from app.integrations.google_calendar.errors import (
@@ -168,13 +169,18 @@ class GoogleCalendarClient:
         attendees = [{"email": user.email}] if user.email else []
         if self.settings.google_admin_email:
             attendees.append({"email": self.settings.google_admin_email})
+        username = f"@{user.telegram_username}" if user.telegram_username else "username не указан"
         description_parts = [
             f"Заявка: {booking.id}",
+            f"Имя: {user.full_name or '-'}",
+            f"Telegram: {username}",
+            f"Email: {user.email or '-'}",
             f"Тип встречи: {meeting_type.name}",
-            f"Ссылка на онлайн-встречу: {meeting_url}",
+            f"Длительность: {booking.duration_minutes} минут",
+            f"Дата и время: {format_datetime_msk(booking.starts_at)}",
+            f"Комментарий: {booking.user_comment or '-'}",
+            f"Ссылка на видеовстречу: {meeting_url}",
         ]
-        if booking.user_comment:
-            description_parts.append(f"Комментарий пользователя: {booking.user_comment}")
         return {
             "summary": f"{meeting_type.name}: {user.full_name or 'пользователь'}",
             "description": "\n".join(description_parts),

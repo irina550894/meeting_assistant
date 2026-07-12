@@ -89,6 +89,29 @@ class AdminFlowService:
         )
         return audit
 
+    def complete_reschedule(
+        self,
+        *,
+        previous_booking: BookingRecord,
+        new_booking: BookingRecord,
+        now: datetime,
+    ) -> AuditEntry:
+        audit = self.booking_service.complete_reschedule(
+            previous_booking,
+            now=now,
+            new_booking_id=str(new_booking.id),
+        )
+        logger.info(
+            "Admin confirmed reschedule",
+            extra={
+                "event": "admin_action",
+                "action": "complete_reschedule",
+                "previous_booking_id": str(previous_booking.id),
+                "new_booking_id": str(new_booking.id),
+            },
+        )
+        return audit
+
     def block_user(
         self,
         *,

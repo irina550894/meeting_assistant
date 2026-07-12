@@ -172,3 +172,35 @@ def test_reschedule_creates_new_booking_and_links_previous() -> None:
     assert old_booking.status == BookingStatus.RESCHEDULE_REQUESTED
     assert result.booking.is_reschedule_request is True
     assert result.booking.previous_booking_id == old_booking.id
+
+
+def test_complete_reschedule_marks_previous_booking_rescheduled() -> None:
+    user = consented_user()
+    old_booking = create_pending_booking(user=user)
+    service().confirm_booking(
+        old_booking,
+        google_calendar_event_id="event-1",
+        meeting_url="https://meet.example.com/1",
+        now=NOW,
+    )
+    new_booking = service().create_booking(
+        user=user,
+        meeting_type=consultation(),
+        duration_minutes=60,
+        starts_at=NOW + timedelta(days=3),
+        ends_at=NOW + timedelta(days=3, hours=1),
+        now=NOW + timedelta(hours=1),
+        existing_bookings=[],
+        final_confirmation=True,
+        previous_booking=old_booking,
+    ).booking
+
+    audit = service().complete_reschedule(
+        old_booking,
+        now=NOW + timedelta(hours=2),
+        new_booking_id=str(new_booking.id),
+    )
+
+    assert old_booking.status == BookingStatus.RESCHEDULED
+    assert audit.action == "booking_rescheduled"
+    assert audit.payload["new_booking_id"] == str(new_booking.id)

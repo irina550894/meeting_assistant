@@ -122,6 +122,7 @@ async def build_telegram_runtime(settings) -> TelegramRuntime:
         calendar=confirmation_gateway,
         clock=clock,
         notifier=TelegramAdminNotifier(bot=bot, store=store),
+        calendar_events=event_gateway,
         background_jobs=background_jobs,
         diagnostics=DiagnosticsService(
             settings,

@@ -9,11 +9,12 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
-from app.core.booking import MeetingType
+from app.core.booking import BookingRecord, BookingStatus, MeetingType, UserProfile
 from app.core.scheduling import AvailableSlot
 from app.core.user_flow import BookingDraft
 from app.integrations.telegram import messages
 from app.integrations.telegram.keyboards import dates_keyboard, menu_reply_keyboard, slots_keyboard
+from app.integrations.telegram.local_notifiers import _confirmed_booking_text
 from app.integrations.telegram.user_router import _edit_or_answer, _review_text
 
 
@@ -99,3 +100,38 @@ def test_menu_reply_keyboard_has_menu_button() -> None:
     keyboard = menu_reply_keyboard()
 
     assert keyboard.keyboard[0][0].text == "Меню"
+
+
+def test_confirmed_booking_text_contains_full_booking_details() -> None:
+    user = UserProfile(
+        telegram_id=1001,
+        telegram_username="client_user",
+        full_name="Ирина",
+        email="client@inbox.ru",
+    )
+    meeting_type = MeetingType(name="Консультация", allowed_durations_minutes=(60,))
+    booking = BookingRecord(
+        user_id=user.id,
+        meeting_type_id=meeting_type.id,
+        duration_minutes=60,
+        starts_at=datetime(2026, 7, 13, 7, 0, tzinfo=UTC),
+        ends_at=datetime(2026, 7, 13, 8, 0, tzinfo=UTC),
+        status=BookingStatus.CONFIRMED,
+        user_comment="Обсудить проект",
+        meeting_url="https://telemost.example/meeting",
+    )
+
+    text = _confirmed_booking_text(
+        booking=booking,
+        user=user,
+        meeting_type=meeting_type,
+    )
+
+    assert "Имя: Ирина" in text
+    assert "Telegram: @client_user" in text
+    assert "Email: client@inbox.ru" in text
+    assert "Тип встречи: Консультация" in text
+    assert "Длительность: 60 минут" in text
+    assert "Дата и время: 13.07.2026 10:00 МСК" in text
+    assert "Комментарий: Обсудить проект" in text
+    assert "Ссылка на видеовстречу: https://telemost.example/meeting" in text

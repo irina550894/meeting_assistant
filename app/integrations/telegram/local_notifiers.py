@@ -3,16 +3,16 @@ from uuid import UUID
 
 from aiogram import Bot
 
-from app.core.booking import BookingRecord, UserProfile
+from app.core.booking import BookingRecord, MeetingType, UserProfile
+from app.core.datetime_formatting import format_datetime_msk
 from app.integrations.telegram.admin_keyboards import admin_booking_actions_keyboard
-from app.integrations.telegram.formatting import format_datetime_msk
 from app.logging.config import get_logger
 from app.settings.config import Settings
 
 logger = get_logger(__name__)
 
 
-class UserLookupStore(Protocol):
+class RuntimeLookupStore(Protocol):
     async def get(self, entity_id: UUID) -> object | None: ...
 
 
@@ -55,18 +55,23 @@ class TelegramUserFlowNotifier:
 
 
 class TelegramAdminNotifier:
-    def __init__(self, *, bot: Bot, store: UserLookupStore) -> None:
+    def __init__(self, *, bot: Bot, store: RuntimeLookupStore) -> None:
         self.bot = bot
         self.store = store
 
     async def booking_confirmed(self, booking: BookingRecord) -> None:
         user = await self.store.get(booking.user_id)
-        if not isinstance(user, UserProfile):
+        meeting_type = await self.store.get(booking.meeting_type_id)
+        if not isinstance(user, UserProfile) or not isinstance(meeting_type, MeetingType):
             return
         await _send_telegram_message(
             self.bot,
             chat_id=user.telegram_id,
-            text="Встреча подтверждена. Приглашение отправлено на email.",
+            text=_confirmed_booking_text(
+                booking=booking,
+                user=user,
+                meeting_type=meeting_type,
+            ),
         )
 
     async def booking_rejected(self, booking: BookingRecord, reason: str | None) -> None:
@@ -107,3 +112,28 @@ async def _send_telegram_message(bot: Bot, **kwargs):
             },
         )
         raise
+
+
+def _confirmed_booking_text(
+    *,
+    booking: BookingRecord,
+    user: UserProfile,
+    meeting_type: MeetingType,
+) -> str:
+    username = f"@{user.telegram_username}" if user.telegram_username else "username не указан"
+    return "\n".join(
+        [
+            "Встреча подтверждена.",
+            "",
+            f"Имя: {user.full_name or '-'}",
+            f"Telegram: {username}",
+            f"Email: {user.email or '-'}",
+            f"Тип встречи: {meeting_type.name}",
+            f"Длительность: {booking.duration_minutes} минут",
+            f"Дата и время: {format_datetime_msk(booking.starts_at)}",
+            f"Комментарий: {booking.user_comment or '-'}",
+            f"Ссылка на видеовстречу: {booking.meeting_url or '-'}",
+            "",
+            "Приглашение отправлено на email через Google Calendar.",
+        ]
+    )
