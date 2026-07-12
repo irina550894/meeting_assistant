@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -41,10 +42,14 @@ from app.settings.config import get_settings
 logger = get_logger(__name__)
 
 
-async def run_local_polling() -> None:
-    settings = get_settings()
-    configure_logging(settings.log_level)
+@dataclass(slots=True)
+class TelegramRuntime:
+    bot: Bot
+    dispatcher: Dispatcher
+    storage: str
 
+
+async def build_telegram_runtime(settings) -> TelegramRuntime:
     if settings.telegram_bot_token is None:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is required to run the bot.")
     if settings.personal_data_consent_url is None or settings.personal_data_policy_url is None:
@@ -131,17 +136,24 @@ async def run_local_polling() -> None:
     dispatcher = Dispatcher()
     dispatcher.include_router(create_admin_router(admin_deps))
     dispatcher.include_router(create_user_router(user_deps))
+    return TelegramRuntime(bot=bot, dispatcher=dispatcher, storage=storage)
+
+
+async def run_local_polling() -> None:
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    runtime = await build_telegram_runtime(settings)
 
     logger.info(
         "Telegram bot polling started",
         extra={
             "event": "telegram_polling_started",
             "admin_configured": settings.telegram_admin_id is not None,
-            "storage": storage,
+            "storage": runtime.storage,
         },
     )
     try:
-        await dispatcher.start_polling(bot)
+        await runtime.dispatcher.start_polling(runtime.bot)
     except Exception as error:
         logger.critical(
             "Telegram polling failed",
@@ -155,11 +167,11 @@ async def run_local_polling() -> None:
             settings,
             source="telegram_polling",
             error_type=type(error).__name__,
-            bot=bot,
+            bot=runtime.bot,
         )
         raise
     finally:
-        await bot.session.close()
+        await runtime.bot.session.close()
 
 
 def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:

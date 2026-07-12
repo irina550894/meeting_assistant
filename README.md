@@ -122,6 +122,28 @@ Rollback the last migration:
 alembic downgrade -1
 ```
 
+## Production VPS Deployment
+
+Stage 10 production files:
+
+- `Dockerfile`
+- `docker-compose.prod.yml`
+- `deploy/caddy/Caddyfile`
+- `.env.production.example`
+- `deploy/README.md`
+
+Production uses Docker Compose with four services: `app`, `worker`, `postgres` and
+`caddy`. Telegram runs through HTTPS webhook; local long polling remains for local checks.
+
+On the VPS, create `.env.production` from `.env.production.example`, fill real values there
+and run:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+Detailed commands and the beginner checklist are in `deploy/README.md`.
+
 ## Logs And Diagnostics
 
 Application logs are JSON lines. Useful fields:
