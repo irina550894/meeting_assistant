@@ -1,173 +1,246 @@
 # Telegram-бот "Ассистент по встречам"
 
-MVP backend scaffold for a Telegram meeting assistant.
+MVP Telegram-бота для записи пользователей на онлайн-встречи с Ириной Бирюковой.
+Пользователь выбирает тип встречи, дату и свободный слот, оставляет имя, email и
+комментарий. Администратор получает заявку в Telegram, подтверждает, отклоняет,
+переносит или блокирует пользователя. После подтверждения создается событие в
+Google Calendar.
 
-## Current Stage
+## Статус MVP
 
-Stage 1: project scaffold and local environment.
+- Этапы 1-10 реализованы и развернуты на production VPS.
+- Этап 11: сквозной UAT пройден, найденные дефекты исправлены и задеплоены.
+- Этап 12: финальная приемка, инструкции и ограничения зафиксированы.
+- Production URL: `https://calendar.finforbiz.pro/health`.
 
-## Local Setup
+## Стек
 
-1. Create and activate a Python 3.12 virtual environment.
-2. Install dependencies:
+- Python 3.12
+- aiogram 3.x
+- FastAPI + Uvicorn
+- PostgreSQL 16
+- SQLAlchemy 2.x + Alembic
+- PostgreSQL-backed worker без Redis/Celery
+- Docker Compose
+- Caddy HTTPS
+- Google Calendar API
+
+## Локальный запуск
+
+1. Создать и активировать Python 3.12 virtual environment.
+2. Установить зависимости:
 
 ```powershell
 pip install -e ".[dev]"
 ```
 
-3. Fill local `.env` values. Do not commit `.env`.
-4. For the current local stages 8-9, use a locally installed PostgreSQL 16 on Windows.
-   Do not use Docker on a low-RAM local machine. After PostgreSQL is installed, apply
-   migrations. To configure local database credentials without printing the password:
+3. Заполнить локальный `.env`. Реальные значения не коммитить.
+4. Настроить локальную PostgreSQL без вывода пароля:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\configure_local_postgres_env.py
 ```
 
-Apply migrations:
+5. Применить миграции:
 
 ```powershell
 .\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Check local database and worker diagnostics:
+6. Проверить локальную БД и worker diagnostics:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\check_local_runtime.py
 ```
 
-5. Run the API:
+7. Запустить FastAPI:
 
 ```powershell
-uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-6. Open healthcheck:
+8. Открыть healthcheck:
 
 ```text
 http://127.0.0.1:8000/health
 ```
 
-7. Run worker stub:
+9. Запустить worker:
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.worker.main
 ```
 
-8. Run the local Telegram bot polling mode for manual checks:
+10. Для ручной Telegram-проверки локально запустить polling:
 
 ```powershell
 .\.venv\Scripts\python.exe -m app.integrations.telegram.run_polling
 ```
 
-Local polling can use persistent PostgreSQL storage:
+Для persistence в polling:
 
 ```dotenv
 TELEGRAM_STORAGE=postgres
 ```
 
-If `TELEGRAM_STORAGE` is omitted or set to `memory`, polling uses in-memory storage. That
-mode is useful for quick checks, but data is lost when the process stops.
+Если `TELEGRAM_STORAGE` не задан или равен `memory`, polling использует память
+процесса, и данные пропадают после остановки.
 
-Admin sections available in local polling:
-
-- `/admin` opens pending bookings, all bookings and blocked users.
-- `Расписание` shows schedule settings and working hours.
-- `Ограничения` shows upcoming restrictions and can add/delete a closed day.
-- `Типы встреч` shows meeting types, can add a new meeting type and can enable/disable them.
-- `Фильтры заявок` shows bookings by status with Russian status labels.
-
-Required `.env` values for local Telegram check:
-
-```dotenv
-TELEGRAM_BOT_TOKEN=<token from BotFather>
-TELEGRAM_ADMIN_ID=<your numeric Telegram ID>
-PERSONAL_DATA_CONSENT_URL=https://example.com/consent
-PERSONAL_DATA_POLICY_URL=https://example.com/policy
-DEFAULT_MEETING_URL=https://telemost.yandex.ru/j/75500242705811
-```
-
-9. Optional Google Calendar local check:
-
-```dotenv
-GOOGLE_OAUTH_CLIENT_ID=<Google OAuth client ID>
-GOOGLE_OAUTH_CLIENT_SECRET=<Google OAuth client secret>
-GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/oauth/google/callback
-GOOGLE_OAUTH_REFRESH_TOKEN=<refresh token for local polling, do not commit>
-GOOGLE_CALENDAR_ID=primary
-GOOGLE_ADMIN_EMAIL=<admin email for calendar invites>
-```
-
-Start the FastAPI app and open `/oauth/google/start` to get the authorization URL. The
-current local callback stores tokens in process memory; for Telegram polling checks use
-`GOOGLE_OAUTH_REFRESH_TOKEN` in the local `.env`. Do not commit real Google secrets.
-
-10. Run tests:
+## Проверки
 
 ```powershell
-pytest
+.\.venv\Scripts\python.exe -m ruff check app tests scripts
+.\.venv\Scripts\python.exe -m compileall app tests scripts
+.\.venv\Scripts\python.exe -m pytest
 ```
 
-## Database Migrations
+Финальный статус на 12.07.2026:
 
-Apply migrations:
+- `ruff`: passed.
+- `compileall`: passed.
+- `pytest`: 84 passed, 1 warning.
+- Production healthcheck: HTTP 200.
+- Production containers: `app` healthy, `postgres` healthy, `worker` up.
 
-```powershell
-alembic upgrade head
-```
+## Инструкция администратора
 
-Rollback the last migration:
+1. Откройте Telegram-бота и используйте `/admin`.
+2. Раздел с заявками показывает ожидающие и активные заявки.
+3. В карточке заявки проверьте имя, Telegram username, email, тип встречи,
+   длительность, дату, время `МСК`, комментарий.
+4. Если заявка корректна, нажмите подтверждение. Бот создаст событие в Google
+   Calendar, а пользователь получит Telegram-уведомление.
+5. Если заявка не подходит, отклоните ее с причиной. Внутренний резерв слота
+   будет снят.
+6. Если пользователь отменил или администратор отменил подтвержденную встречу,
+   событие Google Calendar отменяется, а слот снова становится свободным.
+7. Для переноса пользователь создает новую заявку. После подтверждения новой
+   заявки старая встреча переводится в статус перенесенной, старое событие
+   Google Calendar отменяется.
+8. Для блокировки используйте админ-действие блокировки. Активные подтвержденные
+   встречи пользователя отменяются в календаре.
+9. Для диагностики используйте `/diag`. Вывод показывает только безопасные
+   configured true/false флаги и не раскрывает секреты.
 
-```powershell
-alembic downgrade -1
-```
+Доступные admin-разделы:
 
-## Production VPS Deployment
+- `/admin` - заявки, фильтры, пользователи.
+- `Расписание` - рабочие часы и настройки расписания.
+- `Ограничения` - закрытые дни.
+- `Типы встреч` - включение, отключение и добавление типов встреч.
+- `Фильтры заявок` - просмотр заявок по статусам.
 
-Stage 10 production files:
+## Production эксплуатация
 
-- `Dockerfile`
-- `docker-compose.prod.yml`
-- `deploy/caddy/Caddyfile`
-- `.env.production.example`
-- `deploy/README.md`
+Фактическая production-схема:
 
-Production uses Docker Compose with four services: `app`, `worker`, `postgres` and
-`caddy`. Telegram runs through HTTPS webhook; local long polling remains for local checks.
+- VPS folder: `/home/irina/meeting_assistant`
+- Docker services: `postgres`, `app`, `worker`
+- App port: `127.0.0.1:8010 -> container 8000`
+- HTTPS reverse proxy: системный Caddy на VPS
+- Domain: `calendar.finforbiz.pro`
 
-On the VPS, create `.env.production` from `.env.production.example`, fill real values there
-and run:
+Основная команда запуска на VPS:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+cd /home/irina/meeting_assistant
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  up -d --build postgres app worker
 ```
 
-Detailed commands and the beginner checklist are in `deploy/README.md`.
+Перезапуск app и worker:
 
-## Logs And Diagnostics
-
-Application logs are JSON lines. Useful fields:
-
-- `timestamp`: UTC log time.
-- `level`: `debug`, `info`, `warning`, `error`, or `critical`.
-- `event`: machine-readable event name.
-- `operation_id`: request or scenario correlation id.
-- `service`: `app`, `worker`, or another component name when provided.
-
-Useful searches:
-
-```powershell
-Select-String -Path .logs\*.log -Pattern '"level": "error"'
-Select-String -Path .logs\*.log -Pattern 'google_api_error'
-Select-String -Path .logs\*.log -Pattern 'telegram_api_error'
-Select-String -Path .logs\*.log -Pattern 'operation_id'
+```bash
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  restart app worker
 ```
 
-Telegram admin diagnostics:
+Проверка контейнеров:
 
-```text
-/diag
+```bash
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  ps
 ```
 
-The diagnostics output uses only safe configured true/false flags and does not print
-tokens, passwords, OAuth client secrets, refresh tokens, or real values from `.env`.
+## Логи и диагностика
+
+App logs:
+
+```bash
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  logs -f app
+```
+
+Worker logs:
+
+```bash
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  logs -f worker
+```
+
+Полезные события:
+
+- `healthcheck_ok` - приложение отвечает.
+- `telegram_webhook_configured` - Telegram webhook установлен.
+- `worker_started` - worker запущен.
+- `background_jobs_recovered` - фоновые задачи восстановлены.
+- `job_started`, `job_succeeded`, `job_failed` - выполнение фоновых задач.
+- `google_event_created` - создано событие Google Calendar.
+- `google_event_cancelled` - событие Google Calendar отменено.
+- `google_api_error` - ошибка Google API.
+- `telegram_api_error` - ошибка Telegram API.
+
+Признаки проблем:
+
+- Google Calendar недоступен: в логах появляются `google_api_error`, событие
+  календаря не создается или не отменяется.
+- Telegram webhook не работает: нет входящих webhook-событий, есть ошибки
+  Telegram API, healthcheck при этом может оставаться зеленым.
+- Worker не выполняет задачи: нет `worker_started`, `job_started` или
+  `job_succeeded`, либо контейнер `worker` не в статусе `Up`.
+
+## Известные ограничения MVP
+
+- Email-уведомления реализованы через Google Calendar invitations/cancellations.
+  Отдельного SMTP/email-провайдера в утвержденном стеке MVP нет.
+- До отправки письма нельзя надежно доказать существование конкретного mailbox
+  без внешнего email-verification сервиса. Текущая проверка валидирует формат и
+  доменную доставляемость.
+- Резервные копии базы данных не входят в MVP.
+- Лимит встреч в день в MVP выключен, но модель допускает будущую настройку.
+- Telegram Mini App не входит в MVP; backend подготовлен к будущему API.
+- Production использует системный Caddy VPS, потому что на сервере уже работают
+  другие домены. Caddy-контейнер из `docker-compose.prod.yml` в текущей схеме не
+  запускается.
+
+## Backlog
+
+### v1.1
+
+- Отдельный email-провайдер или SMTP для уведомлений вне Google Calendar.
+- Email-verification сервис для более строгой проверки mailbox.
+- Telegram Mini App поверх текущего FastAPI/backend-ядра.
+- Админ-экран для просмотра audit-log и ошибок без SSH.
+- Настраиваемый дневной лимит встреч из админ-интерфейса.
+
+### v2
+
+- Мультиадминность и несколько календарей.
+- Резервные копии PostgreSQL и регламент восстановления.
+- Расширенная аналитика заявок и конверсий.
+- Очередь фоновых задач с отдельной инфраструктурой, если нагрузка превысит MVP.
