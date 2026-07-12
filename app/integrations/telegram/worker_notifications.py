@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import Bot
 
+from app.integrations.telegram.formatting import format_datetime_msk
 from app.logging.config import get_logger
 from app.worker.jobs import ReminderBooking
 
@@ -31,7 +32,7 @@ class TelegramReminderSender:
 
 
 def _reminder_text(booking: ReminderBooking, *, reminder_kind: str) -> str:
-    starts_at = booking.starts_at.strftime("%d.%m.%Y %H:%M")
+    starts_at = format_datetime_msk(booking.starts_at)
     title = "Напоминание о встрече"
     if reminder_kind == "24h":
         title = "Напоминание: встреча через 24 часа"

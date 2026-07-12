@@ -1,6 +1,7 @@
-import re
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
+
+from email_validator import EmailNotValidError, validate_email
 
 from app.core.booking import (
     BookingCreationResult,
@@ -16,25 +17,29 @@ from app.logging.config import get_logger
 
 logger = get_logger(__name__)
 
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
 class UserFlowService:
     def __init__(
         self,
         *,
         booking_service: BookingService | None = None,
         slot_service: SlotCalculationService | None = None,
+        check_email_deliverability: bool = True,
     ) -> None:
         self.booking_service = booking_service or BookingService()
         self.slot_service = slot_service or SlotCalculationService()
+        self.check_email_deliverability = check_email_deliverability
 
     def validate_email(self, value: str) -> str:
         email = value.strip()
-        if not EMAIL_RE.fullmatch(email):
+        try:
+            result = validate_email(
+                email,
+                check_deliverability=self.check_email_deliverability,
+            )
+        except EmailNotValidError as error:
             logger.warning("Email validation failed", extra={"event": "email_validation_failed"})
-            raise UserFlowError("invalid_email", "Email is invalid.")
-        return email
+            raise UserFlowError("invalid_email", "Email is invalid.") from error
+        return result.normalized
 
     def accept_consent(
         self,

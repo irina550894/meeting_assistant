@@ -17,7 +17,7 @@ def booking_service() -> BookingService:
 
 
 def flow() -> UserFlowService:
-    return UserFlowService(booking_service=booking_service())
+    return UserFlowService(booking_service=booking_service(), check_email_deliverability=False)
 
 
 def consented_user():
@@ -94,6 +94,18 @@ def test_consent_requires_document_urls() -> None:
 def test_email_validation_rejects_invalid_email() -> None:
     with pytest.raises(UserFlowError) as error:
         flow().validate_email("not-an-email")
+
+    assert error.value.code == "invalid_email"
+
+
+def test_email_validation_rejects_domain_without_deliverability() -> None:
+    service = UserFlowService(
+        booking_service=booking_service(),
+        check_email_deliverability=True,
+    )
+
+    with pytest.raises(UserFlowError) as error:
+        service.validate_email("client@example.com")
 
     assert error.value.code == "invalid_email"
 

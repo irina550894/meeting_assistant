@@ -11,9 +11,11 @@ from app.core.booking import BookingRecord, BusinessRuleError, MeetingType, User
 from app.core.user_flow import BookingDraft, UserFlowError
 from app.integrations.google_calendar import GoogleCalendarError
 from app.integrations.telegram import messages
+from app.integrations.telegram.formatting import format_datetime_msk
 from app.integrations.telegram.keyboards import (
     BACK,
     CANCEL,
+    MENU,
     booking_actions_keyboard,
     bookings_keyboard,
     comment_keyboard,
@@ -24,6 +26,7 @@ from app.integrations.telegram.keyboards import (
     email_found_keyboard,
     main_menu_keyboard,
     meeting_types_keyboard,
+    menu_reply_keyboard,
     review_keyboard,
     slots_keyboard,
     text_navigation_keyboard,
@@ -57,6 +60,10 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
         await state.clear()
         await callback.answer()
         await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+
+    @router.message(F.text == MENU)
+    async def menu_message(message: Message, state: FSMContext) -> None:
+        await _show_menu(message, state)
 
     @router.callback_query(F.data.startswith("uf:consent:"))
     async def consent_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -297,7 +304,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
                 await deps.notifier.booking_created(result.booking)
         await state.clear()
         await callback.answer()
-        await _edit_or_answer(callback, messages.BOOKING_SENT, reply_markup=main_menu_keyboard())
+        await _edit_or_answer(callback, messages.BOOKING_SENT, reply_markup=menu_reply_keyboard())
 
     @router.callback_query(F.data == "uf:my")
     async def my_bookings_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -382,7 +389,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             await deps.notifier.booking_cancelled_by_user(booking)
         await state.clear()
         await callback.answer()
-        await _edit_or_answer(callback, messages.USER_CANCELLED, reply_markup=main_menu_keyboard())
+        await _edit_or_answer(callback, messages.USER_CANCELLED, reply_markup=menu_reply_keyboard())
 
     @router.callback_query(F.data.startswith("uf:reschedule:"))
     async def reschedule_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -410,7 +417,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
         await _edit_or_answer(
             callback,
             messages.CANCELLED_FLOW,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_reply_keyboard(),
         )
 
     @router.callback_query(F.data == "uf:back")
@@ -530,7 +537,7 @@ async def _handle_text_navigation(
         logger.info("User flow cancelled", extra={"event": "user_flow_cancelled"})
         await message.answer(
             messages.CANCELLED_FLOW,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=menu_reply_keyboard(),
         )
         return True
     if message.text == BACK:
@@ -708,9 +715,9 @@ def _review_text(draft: BookingDraft, meeting_type: MeetingType | None) -> str:
         f"Имя: {draft.full_name}",
         f"Email: {draft.email}",
         f"Тип: {meeting_type.name if meeting_type else '-'}",
-        f"Длительность: {draft.duration_minutes} минут",
+            f"Длительность: {draft.duration_minutes} минут",
         (
-            f"Дата и время: {draft.starts_at:%d.%m.%Y %H:%M}"
+            f"Дата и время: {format_datetime_msk(draft.starts_at)}"
             if draft.starts_at
             else "Дата и время: -"
         ),
@@ -732,6 +739,6 @@ def _booking_text(booking: BookingRecord) -> str:
 
 def _booking_summary(booking: BookingRecord) -> str:
     return (
-        f"{booking.starts_at:%d.%m.%Y %H:%M}, "
+        f"{format_datetime_msk(booking.starts_at)}, "
         f"{booking.duration_minutes} минут, {booking_status_label(booking.status)}"
     )

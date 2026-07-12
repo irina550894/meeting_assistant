@@ -24,6 +24,7 @@ from app.integrations.telegram.admin_keyboards import (
     restrictions_keyboard,
 )
 from app.integrations.telegram.admin_states import AdminStates
+from app.integrations.telegram.formatting import format_datetime_msk
 from app.integrations.telegram.ports import (
     AdminFlowDependencies,
     AdminScheduleSettings,
@@ -794,9 +795,7 @@ def _booking_card_text(card: AdminBookingCard) -> str:
     user = card.user
     username = f"@{user.telegram_username}" if user.telegram_username else "username не указан"
     comment = booking.user_comment or "-"
-    reserved_until = (
-        booking.reserved_until.strftime("%d.%m.%Y %H:%M") if booking.reserved_until else "-"
-    )
+    reserved_until = format_datetime_msk(booking.reserved_until) if booking.reserved_until else "-"
     return "\n".join(
         [
             "Заявка на встречу",
@@ -805,8 +804,7 @@ def _booking_card_text(card: AdminBookingCard) -> str:
             f"Email: {user.email or '-'}",
             f"Тип: {card.meeting_type.name}",
             f"Длительность: {booking.duration_minutes} минут",
-            f"Дата: {booking.starts_at:%d.%m.%Y}",
-            f"Время: {booking.starts_at:%H:%M}",
+            f"Дата и время: {format_datetime_msk(booking.starts_at)}",
             f"Комментарий: {comment}",
             f"Статус: {booking_status_label(booking.status)}",
             f"Резерв до: {reserved_until}",

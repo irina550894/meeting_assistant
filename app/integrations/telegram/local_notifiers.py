@@ -5,6 +5,7 @@ from aiogram import Bot
 
 from app.core.booking import BookingRecord, UserProfile
 from app.integrations.telegram.admin_keyboards import admin_booking_actions_keyboard
+from app.integrations.telegram.formatting import format_datetime_msk
 from app.logging.config import get_logger
 from app.settings.config import Settings
 
@@ -28,7 +29,7 @@ class TelegramUserFlowNotifier:
             chat_id=self.settings.telegram_admin_id,
             text=(
                 "Поступила новая заявка на встречу: "
-                f"{booking.starts_at:%d.%m.%Y} {booking.starts_at:%H:%M}."
+                f"{format_datetime_msk(booking.starts_at)}."
             ),
             reply_markup=admin_booking_actions_keyboard(booking),
         )

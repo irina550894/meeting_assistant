@@ -4,6 +4,7 @@ from uuid import UUID
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.booking import BookingRecord, BookingStatus, UserProfile
+from app.integrations.telegram.formatting import format_datetime_msk
 from app.integrations.telegram.ports import AdminMeetingType, AdminScheduleRestriction
 from app.integrations.telegram.status_labels import booking_status_label
 
@@ -26,7 +27,8 @@ def admin_bookings_keyboard(bookings: Iterable[BookingRecord]) -> InlineKeyboard
     rows = [
         [
             InlineKeyboardButton(
-                text=f"{booking.starts_at:%d.%m %H:%M} - {booking_status_label(booking.status)}",
+                text=f"{format_datetime_msk(booking.starts_at)} - "
+                f"{booking_status_label(booking.status)}",
                 callback_data=f"adm:booking:{booking.id}",
             )
         ]

@@ -11,10 +11,16 @@ from aiogram.types import (
 
 from app.core.booking import BookingRecord, BookingStatus, MeetingType
 from app.core.scheduling import AvailableSlot
+from app.integrations.telegram.formatting import (
+    format_date_with_weekday,
+    format_datetime_msk,
+    format_time_msk,
+)
 from app.integrations.telegram.status_labels import booking_status_label
 
 BACK = "Назад"
 CANCEL = "Отмена"
+MENU = "Меню"
 
 
 def main_menu_keyboard() -> InlineKeyboardMarkup:
@@ -69,6 +75,13 @@ def text_navigation_keyboard(*, include_back: bool = True) -> ReplyKeyboardMarku
     return ReplyKeyboardMarkup(keyboard=[buttons], resize_keyboard=True)
 
 
+def menu_reply_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=MENU)]],
+        resize_keyboard=True,
+    )
+
+
 def email_found_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -106,7 +119,12 @@ def dates_keyboard(dates: list[date], *, page: int = 0, page_size: int = 7) -> I
     start = page * page_size
     visible_dates = dates[start : start + page_size]
     rows = [
-        [InlineKeyboardButton(text=item.strftime("%d.%m.%Y"), callback_data=f"uf:date:{item}")]
+        [
+            InlineKeyboardButton(
+                text=format_date_with_weekday(item),
+                callback_data=f"uf:date:{item}",
+            )
+        ]
         for item in visible_dates
     ]
     pager = []
@@ -124,7 +142,7 @@ def slots_keyboard(slots: Iterable[AvailableSlot]) -> InlineKeyboardMarkup:
     rows = [
         [
             InlineKeyboardButton(
-                text=slot.starts_at.strftime("%H:%M"),
+                text=format_time_msk(slot.starts_at),
                 callback_data=f"uf:slot:{index}",
             )
         ]
@@ -156,7 +174,8 @@ def bookings_keyboard(bookings: Iterable[BookingRecord]) -> InlineKeyboardMarkup
     rows = [
         [
             InlineKeyboardButton(
-                text=f"{booking.starts_at:%d.%m %H:%M} - {booking_status_label(booking.status)}",
+                text=f"{format_datetime_msk(booking.starts_at)} - "
+                f"{booking_status_label(booking.status)}",
                 callback_data=f"uf:booking:{booking.id}",
             )
         ]
