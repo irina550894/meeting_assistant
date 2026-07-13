@@ -1,0 +1,131 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/deploy-production.yml"
+      - "app/**"
+      - "scripts/**"
+      - "tests/**"
+      - "deploy/caddy/**"
+      - "Dockerfile"
+      - "docker-compose*.yml"
+      - "pyproject.toml"
+      - "alembic.ini"
+      - ".env.production.example"
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test-and-deploy:
+    name: Test and deploy to VPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run lint
+        run: python -m ruff check app tests scripts
+
+      - name: Run compile check
+        run: python -m compileall app tests scripts
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Validate deploy secrets
+        run: |
+          missing=0
+          for name in VPS_HOST VPS_USER VPS_SSH_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::warning::$name is not configured"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "DEPLOY_SECRETS_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "Deploy will be skipped because required secrets are missing."
+          else
+            echo "DEPLOY_SECRETS_CONFIGURED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Prepare SSH
+        if: env.DEPLOY_SECRETS_CONFIGURED == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${VPS_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh_port="${VPS_PORT:-22}"
+          if [ -n "${VPS_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${VPS_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$ssh_port" "$VPS_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Create release archive
+        if: env.DEPLOY_SECRETS_CONFIGURED == 'true'
+        run: |
+          set -euo pipefail
+          archive_name="meeting_assistant_${GITHUB_SHA}.tar"
+          git archive --format=tar -o "$archive_name" "$GITHUB_SHA"
+          echo "ARCHIVE_NAME=$archive_name" >> "$GITHUB_ENV"
+
+      - name: Upload archive and deploy script
+        if: env.DEPLOY_SECRETS_CONFIGURED == 'true'
+        run: |
+          set -euo pipefail
+          ssh_port="${VPS_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$ssh_port" \
+            "$ARCHIVE_NAME" scripts/deploy_production.sh \
+            "${VPS_USER}@${VPS_HOST}:/tmp/"
+
+      - name: Deploy on VPS
+        if: env.DEPLOY_SECRETS_CONFIGURED == 'true'
+        run: |
+          set -euo pipefail
+          ssh_port="${VPS_PORT:-22}"
+          deploy_path="${VPS_DEPLOY_PATH:-/home/irina/meeting_assistant}"
+
+          ssh -i ~/.ssh/deploy_key -p "$ssh_port" "${VPS_USER}@${VPS_HOST}" \
+            "ARCHIVE_PATH='/tmp/${ARCHIVE_NAME}' DEPLOY_DIR='${deploy_path}' COMMIT_SHA='${GITHUB_SHA}' bash /tmp/deploy_production.sh"
+
+      - name: Report skipped deploy
+        if: env.DEPLOY_SECRETS_CONFIGURED != 'true'
+        run: |
+          echo "Tests completed, deploy skipped. Configure GitHub Actions secrets to enable automatic VPS deploy."
+
+      - name: Cleanup local deploy key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key

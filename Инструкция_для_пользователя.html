@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Инструкция пользователя - Ассистент по встречам</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #d7dee8;
+      --accent: #0f766e;
+      --accent-soft: #dff5f1;
+      --warn: #9a3412;
+      --warn-soft: #fff3e8;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: #103b3a;
+      color: #ffffff;
+      padding: 32px 20px;
+    }
+
+    .header-inner,
+    main {
+      width: min(1040px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 36px;
+      padding-top: 28px;
+      border-top: 1px solid var(--line);
+      font-size: 26px;
+    }
+
+    h3 {
+      margin-top: 24px;
+      font-size: 20px;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    main {
+      padding: 28px 0 56px;
+    }
+
+    .meta {
+      margin-top: 14px;
+      color: #d7f4ef;
+      font-size: 15px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    nav a {
+      display: block;
+      padding: 7px 0;
+      color: var(--text);
+      text-decoration: none;
+      border-bottom: 1px solid #eef2f6;
+    }
+
+    nav a:last-child {
+      border-bottom: 0;
+    }
+
+    .content {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .note,
+    .warning {
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+
+    .note {
+      background: var(--accent-soft);
+      border: 1px solid #b7e8df;
+    }
+
+    .warning {
+      background: var(--warn-soft);
+      border: 1px solid #fed7aa;
+      color: var(--warn);
+    }
+
+    ol,
+    ul {
+      margin: 0 0 18px 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 7px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2f6;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
+
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .checklist li {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      background: #fbfdff;
+    }
+
+    .checklist li::before {
+      content: "";
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 9px;
+      border: 2px solid var(--accent);
+      border-radius: 3px;
+      vertical-align: -2px;
+    }
+
+    .footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 820px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+      }
+
+      .content {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      header {
+        background: #ffffff;
+        color: #000000;
+        padding: 0 0 16px;
+      }
+
+      .meta {
+        color: #333333;
+      }
+
+      nav {
+        display: none;
+      }
+
+      main,
+      .header-inner {
+        width: 100%;
+      }
+
+      .layout {
+        display: block;
+      }
+
+      .content {
+        border: 0;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Инструкция пользователя</h1>
+      <p>Telegram-бот "Ассистент по встречам"</p>
+      <p class="meta">Версия для эксплуатации MVP. Дата: 13.07.2026.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="layout">
+      <nav aria-label="Навигация по инструкции">
+        <strong>Разделы</strong>
+        <a href="#about">Кратко о боте</a>
+        <a href="#start">Первый запуск</a>
+        <a href="#booking">Создание заявки</a>
+        <a href="#confirmation">После подтверждения</a>
+        <a href="#my-bookings">Мои заявки</a>
+        <a href="#cancel">Отмена</a>
+        <a href="#reschedule">Перенос</a>
+        <a href="#email">Email</a>
+        <a href="#checklist">Чек-лист</a>
+        <a href="#faq">Частые вопросы</a>
+      </nav>
+
+      <article class="content">
+        <section id="about">
+          <h2>1. Кратко о боте</h2>
+          <p>Бот помогает записаться на онлайн-встречу. Вы выбираете тип встречи, дату, свободное время, указываете имя, email и комментарий.</p>
+          <p>Администратор получает заявку и подтверждает или отклоняет ее. После подтверждения создается событие в Google Calendar.</p>
+          <div class="note">
+            Пользователь видит только свободные слоты. Личный календарь администратора и детали занятости не показываются.
+          </div>
+          <p>Время в Telegram показывается в московском времени с пометкой <code>МСК</code>.</p>
+        </section>
+
+        <section id="start">
+          <h2>2. Первый запуск</h2>
+          <ol>
+            <li>Откройте чат с ботом в Telegram.</li>
+            <li>Нажмите или отправьте команду <code>/start</code>.</li>
+            <li>Прочитайте приветствие.</li>
+            <li>Если бот показывает согласия, отметьте обе галочки.</li>
+            <li>После принятия согласий откроется меню.</li>
+          </ol>
+          <div class="warning">
+            Без двух галочек согласия бот не даст перейти к записи.
+          </div>
+        </section>
+
+        <section id="booking">
+          <h2>3. Как создать заявку</h2>
+          <ol>
+            <li>В меню нажмите <code>Новая запись</code> или <code>Записаться</code>.</li>
+            <li>Введите имя, если бот его попросит.</li>
+            <li>Введите email.</li>
+            <li>Если бот нашел ранее сохраненный email, подтвердите его или выберите изменение email.</li>
+            <li>Выберите тип встречи.</li>
+            <li>Если бот предложит длительность, выберите подходящий вариант.</li>
+            <li>Выберите удобный день. Рядом с датой будет указан день недели.</li>
+            <li>Выберите свободное время. Время показывается с пометкой <code>МСК</code>.</li>
+            <li>Добавьте комментарий или пропустите этот шаг.</li>
+            <li>Проверьте карточку заявки.</li>
+            <li>Если все верно, подтвердите отправку.</li>
+          </ol>
+          <p>После отправки заявка уходит администратору. Слот временно резервируется на 48 часов.</p>
+        </section>
+
+        <section id="review">
+          <h2>4. Что проверить перед отправкой</h2>
+          <ul class="checklist">
+            <li>Имя указано верно.</li>
+            <li>Telegram username указан, если он есть.</li>
+            <li>Email написан без ошибок.</li>
+            <li>Тип встречи выбран правильно.</li>
+            <li>Длительность подходит.</li>
+            <li>Дата выбрана верно.</li>
+            <li>Время указано с пометкой <code>МСК</code>.</li>
+            <li>Комментарий указан правильно или пропущен.</li>
+          </ul>
+          <p>Если заметили ошибку, вернитесь назад или отмените сценарий и начните заново.</p>
+        </section>
+
+        <section id="confirmation">
+          <h2>5. Что происходит после отправки</h2>
+          <ol>
+            <li>Бот сообщает, что заявка ожидает подтверждения администратора.</li>
+            <li>Администратор получает карточку заявки.</li>
+            <li>До подтверждения событие в Google Calendar не создается.</li>
+            <li>После подтверждения вы получите сообщение в Telegram.</li>
+            <li>На email придет приглашение Google Calendar.</li>
+          </ol>
+
+          <h3>Что приходит после подтверждения</h3>
+          <p>После подтверждения администратором бот отправляет в Telegram параметры встречи:</p>
+          <ul>
+            <li>имя;</li>
+            <li>Telegram username;</li>
+            <li>email;</li>
+            <li>тип встречи;</li>
+            <li>длительность;</li>
+            <li>дата;</li>
+            <li>время <code>МСК</code>;</li>
+            <li>комментарий;</li>
+            <li>ссылка на онлайн-встречу.</li>
+          </ul>
+        </section>
+
+        <section id="my-bookings">
+          <h2>6. Как посмотреть свои заявки</h2>
+          <ol>
+            <li>Откройте меню бота.</li>
+            <li>Нажмите <code>Мои заявки</code> или <code>Действующие заявки</code>.</li>
+            <li>Посмотрите список заявок.</li>
+            <li>Выберите нужную заявку, чтобы увидеть детали.</li>
+          </ol>
+          <p>В заявке отображаются статус, дата, время, тип встречи и ссылка, если встреча подтверждена.</p>
+        </section>
+
+        <section id="cancel">
+          <h2>7. Как отменить заявку или встречу</h2>
+          <h3>Ожидающая заявка</h3>
+          <ol>
+            <li>Откройте <code>Мои заявки</code>.</li>
+            <li>Выберите ожидающую заявку.</li>
+            <li>Нажмите <code>Отменить</code>.</li>
+            <li>Подтвердите отмену.</li>
+          </ol>
+          <p>После отмены внутренний резерв снимается, а слот снова становится свободным.</p>
+
+          <h3>Подтвержденная встреча</h3>
+          <ol>
+            <li>Откройте <code>Мои заявки</code>.</li>
+            <li>Выберите подтвержденную встречу.</li>
+            <li>Нажмите <code>Отменить встречу</code>.</li>
+            <li>Подтвердите отмену.</li>
+          </ol>
+          <p>После отмены событие Google Calendar отменяется, администратор получает уведомление, слот снова становится доступным.</p>
+        </section>
+
+        <section id="reschedule">
+          <h2>8. Как перенести встречу</h2>
+          <ol>
+            <li>Откройте <code>Мои заявки</code>.</li>
+            <li>Выберите подтвержденную встречу.</li>
+            <li>Нажмите <code>Перенести</code>.</li>
+            <li>Создайте новую заявку на другую дату и время.</li>
+          </ol>
+          <div class="note">
+            Старая встреча остается действующей, пока администратор не подтвердит новую заявку.
+          </div>
+          <p>После подтверждения новой заявки старая встреча отменяется, а новая создается в Google Calendar.</p>
+        </section>
+
+        <section id="email">
+          <h2>9. Email и приглашения</h2>
+          <h3>Если email не принимается</h3>
+          <ul>
+            <li>Проверьте, что в email есть символ <code>@</code>.</li>
+            <li>Проверьте домен, например <code>example.com</code>.</li>
+            <li>Уберите лишние пробелы.</li>
+            <li>Проверьте, что домен написан без ошибки.</li>
+          </ul>
+
+          <h3>Если письмо не пришло</h3>
+          <ol>
+            <li>Проверьте папку <code>Входящие</code>.</li>
+            <li>Проверьте папку <code>Спам</code>.</li>
+            <li>Проверьте правильность email в заявке.</li>
+            <li>Проверьте, что заявка уже подтверждена администратором.</li>
+            <li>Если письма нет, напишите администратору в Telegram.</li>
+          </ol>
+          <p>Email отправляет Google Calendar. Письмо может задержаться или попасть в спам.</p>
+        </section>
+
+        <section id="blocked">
+          <h2>10. Если бот пишет, что пользователь заблокирован</h2>
+          <p>Новые заявки создать нельзя. Для разблокировки нужно связаться с администратором.</p>
+        </section>
+
+        <section id="checklist">
+          <h2>11. Быстрый чек-лист пользователя</h2>
+          <ul class="checklist">
+            <li>Нажать <code>/start</code>.</li>
+            <li>Принять оба согласия.</li>
+            <li>Создать заявку.</li>
+            <li>Проверить дату с днем недели.</li>
+            <li>Проверить время с <code>МСК</code>.</li>
+            <li>Отправить заявку.</li>
+            <li>Дождаться подтверждения администратора.</li>
+            <li>Проверить Telegram-уведомление.</li>
+            <li>Проверить email-приглашение Google Calendar.</li>
+            <li>Открыть меню и посмотреть действующие заявки.</li>
+          </ul>
+        </section>
+
+        <section id="faq">
+          <h2>12. Частые вопросы</h2>
+          <h3>Почему письмо не пришло, если событие есть в календаре?</h3>
+          <p>Email отправляет Google Calendar. Письмо может попасть в спам, задержаться или не быть отправлено организатору как обычное внешнее письмо.</p>
+
+          <h3>Почему бот не проверяет на 100%, существует ли email?</h3>
+          <p>Без внешнего email-verification сервиса нельзя надежно доказать существование конкретного ящика до отправки письма. Бот проверяет формат и доставляемость домена.</p>
+
+          <h3>Почему событие календаря не создается сразу после заявки?</h3>
+          <p>До подтверждения администратора создается только внутренний резерв. Событие Google Calendar создается после подтверждения.</p>
+
+          <h3>Что делать, если время в Telegram и календаре кажется разным?</h3>
+          <p>Сравните фактическое время и часовой пояс. В Telegram время подписано как <code>МСК</code>. В Google Calendar может отображаться <code>GMT+03:00</code>.</p>
+        </section>
+
+        <p class="footer">Документ не содержит токены, пароли, refresh token и значения .env.</p>
+      </article>
+    </div>
+  </main>
+</body>
+</html>

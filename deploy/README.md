@@ -221,3 +221,7 @@ updates.
 - Caddy obtains and renews HTTPS certificates automatically.
 - Email delivery is handled by Google Calendar invitations/cancellations. There is
   no separate SMTP service in MVP.
+
+## Automatic GitHub Actions deploy
+
+Automatic deploy after code push is described in `deploy/GITHUB_ACTIONS_DEPLOY.md`.

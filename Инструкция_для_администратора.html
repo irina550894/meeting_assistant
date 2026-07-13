@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Инструкция администратора - Ассистент по встречам</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #64748b;
+      --line: #d8dee8;
+      --accent: #1d4ed8;
+      --accent-soft: #e8f0ff;
+      --warn: #92400e;
+      --warn-soft: #fff7ed;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background: #18233a;
+      color: #ffffff;
+      padding: 32px 20px;
+    }
+
+    .header-inner,
+    main {
+      width: min(1080px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 36px;
+      padding-top: 28px;
+      border-top: 1px solid var(--line);
+      font-size: 26px;
+    }
+
+    h3 {
+      margin-top: 24px;
+      font-size: 20px;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    main {
+      padding: 28px 0 56px;
+    }
+
+    .meta {
+      margin-top: 14px;
+      color: #dbeafe;
+      font-size: 15px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    nav strong {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    nav a {
+      display: block;
+      padding: 7px 0;
+      color: var(--text);
+      text-decoration: none;
+      border-bottom: 1px solid #eef2f6;
+    }
+
+    nav a:last-child {
+      border-bottom: 0;
+    }
+
+    .content {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .note,
+    .warning {
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+
+    .note {
+      background: var(--accent-soft);
+      border: 1px solid #bfd2ff;
+    }
+
+    .warning {
+      background: var(--warn-soft);
+      border: 1px solid #fed7aa;
+      color: var(--warn);
+    }
+
+    ol,
+    ul {
+      margin: 0 0 18px 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 7px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #eef2f6;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
+
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .checklist li {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      background: #fbfdff;
+    }
+
+    .checklist li::before {
+      content: "";
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 9px;
+      border: 2px solid var(--accent);
+      border-radius: 3px;
+      vertical-align: -2px;
+    }
+
+    .footer {
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+      }
+
+      .content {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      header {
+        background: #ffffff;
+        color: #000000;
+        padding: 0 0 16px;
+      }
+
+      .meta {
+        color: #333333;
+      }
+
+      nav {
+        display: none;
+      }
+
+      main,
+      .header-inner {
+        width: 100%;
+      }
+
+      .layout {
+        display: block;
+      }
+
+      .content {
+        border: 0;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>Инструкция администратора</h1>
+      <p>Telegram-бот "Ассистент по встречам"</p>
+      <p class="meta">Версия для эксплуатации MVP. Дата: 13.07.2026.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="layout">
+      <nav aria-label="Навигация по инструкции">
+        <strong>Разделы</strong>
+        <a href="#admin">Админ-раздел</a>
+        <a href="#card">Карточка заявки</a>
+        <a href="#confirm">Подтверждение</a>
+        <a href="#reject">Отклонение</a>
+        <a href="#cancel">Отмена</a>
+        <a href="#reschedule">Перенос</a>
+        <a href="#block">Блокировка</a>
+        <a href="#settings">Настройки</a>
+        <a href="#diag">Диагностика</a>
+        <a href="#checklist">Чек-лист</a>
+        <a href="#rules">Что нельзя делать</a>
+      </nav>
+
+      <article class="content">
+        <section id="admin">
+          <h2>1. Как открыть админ-раздел</h2>
+          <ol>
+            <li>Откройте чат с ботом.</li>
+            <li>Введите команду <code>/admin</code>.</li>
+            <li>Если ваш Telegram ID указан как администратор, бот откроет админ-меню.</li>
+          </ol>
+          <div class="warning">
+            Если админ-меню не открылось, Telegram ID не совпадает с настройкой администратора.
+          </div>
+        </section>
+
+        <section id="card">
+          <h2>2. Карточка заявки</h2>
+          <p>Карточка новой заявки должна содержать:</p>
+          <ul class="checklist">
+            <li>Имя пользователя.</li>
+            <li>Telegram username или пометку, что username отсутствует.</li>
+            <li>Email.</li>
+            <li>Тип встречи.</li>
+            <li>Длительность.</li>
+            <li>Дату.</li>
+            <li>Время <code>МСК</code>.</li>
+            <li>Комментарий.</li>
+            <li>Срок действия резерва.</li>
+            <li>Кнопки действий.</li>
+          </ul>
+          <p>Перед подтверждением проверьте дату, время, email и комментарий.</p>
+        </section>
+
+        <section id="confirm">
+          <h2>3. Как подтвердить заявку</h2>
+          <ol>
+            <li>Откройте карточку заявки.</li>
+            <li>Нажмите <code>Подтвердить</code>.</li>
+            <li>Проверьте параметры.</li>
+            <li>Если бот предлагает изменить ссылку онлайн-встречи, оставьте текущую или укажите новую.</li>
+            <li>Подтвердите действие.</li>
+          </ol>
+
+          <h3>Что происходит после подтверждения</h3>
+          <ol>
+            <li>Бот повторно проверяет, свободен ли слот.</li>
+            <li>Создается событие Google Calendar.</li>
+            <li>Пользователь получает Telegram-уведомление.</li>
+            <li>Пользователь и администратор получают email-приглашение Google Calendar.</li>
+          </ol>
+          <div class="note">
+            Если Google Calendar недоступен или слот уже занят, заявка не будет подтверждена. Действие можно повторить позже.
+          </div>
+        </section>
+
+        <section id="reject">
+          <h2>4. Как отклонить заявку</h2>
+          <ol>
+            <li>Откройте карточку заявки.</li>
+            <li>Нажмите <code>Отклонить</code> или <code>Отклонить с причиной</code>.</li>
+            <li>Если выбрали вариант с причиной, введите текст причины.</li>
+            <li>Подтвердите действие.</li>
+          </ol>
+          <p>После отклонения внутренний резерв снимается, слот снова становится свободным, пользователь получает Telegram-уведомление.</p>
+          <div class="note">
+            Отдельное email-письмо об отклонении pending-заявки в MVP не отправляется, потому что событие Google Calendar до подтверждения не создается.
+          </div>
+        </section>
+
+        <section id="cancel">
+          <h2>5. Как отменить подтвержденную встречу</h2>
+          <ol>
+            <li>Найдите подтвержденную заявку.</li>
+            <li>Откройте карточку.</li>
+            <li>Нажмите действие отмены.</li>
+            <li>Подтвердите отмену.</li>
+          </ol>
+          <p>После отмены заявка меняет статус, событие Google Calendar отменяется, пользователь получает Telegram-уведомление, слот снова становится свободным.</p>
+        </section>
+
+        <section id="reschedule">
+          <h2>6. Как обработать перенос</h2>
+          <ol>
+            <li>Пользователь создает новую заявку на другое время.</li>
+            <li>Администратор подтверждает новую заявку.</li>
+            <li>Новая встреча создается в Google Calendar.</li>
+            <li>Старая встреча переводится в статус перенесенной.</li>
+            <li>Старое событие Google Calendar отменяется.</li>
+          </ol>
+          <div class="note">
+            Если новая заявка отклонена или закрыта по TTL, старая встреча остается активной.
+          </div>
+        </section>
+
+        <section id="block">
+          <h2>7. Блокировка и разблокировка</h2>
+          <h3>Как заблокировать пользователя</h3>
+          <ol>
+            <li>Откройте карточку пользователя или заявку пользователя.</li>
+            <li>Нажмите <code>Заблокировать</code>.</li>
+            <li>Подтвердите действие.</li>
+          </ol>
+          <p>После блокировки пользователь не сможет создавать новые заявки. Pending-заявки закрываются, резервы снимаются, подтвержденные будущие встречи отменяются, связанные события Google Calendar отменяются.</p>
+
+          <h3>Как разблокировать пользователя</h3>
+          <ol>
+            <li>Откройте раздел заблокированных пользователей.</li>
+            <li>Выберите пользователя.</li>
+            <li>Нажмите <code>Разблокировать</code>.</li>
+            <li>Подтвердите действие.</li>
+          </ol>
+        </section>
+
+        <section id="message">
+          <h2>8. Как написать пользователю через бот</h2>
+          <ol>
+            <li>Откройте карточку пользователя или заявки.</li>
+            <li>Нажмите действие для сообщения пользователю.</li>
+            <li>Введите текст.</li>
+            <li>Подтвердите отправку.</li>
+          </ol>
+          <div class="warning">
+            Не отправляйте через бот пароли, токены и другую секретную информацию.
+          </div>
+        </section>
+
+        <section id="settings">
+          <h2>9. Расписание, ограничения и типы встреч</h2>
+          <h3>Расписание</h3>
+          <p>В админ-меню откройте раздел <code>Расписание</code>. Можно проверять и менять рабочие дни, рабочие часы, шаг слотов, буфер между встречами, горизонт записи и лимит встреч в день, если он включен.</p>
+
+          <h3>Ограничения</h3>
+          <p>В разделе <code>Ограничения</code> можно закрыть целый день, закрыть отдельный временной интервал, удалить ограничение и посмотреть будущие ограничения.</p>
+
+          <h3>Типы встреч</h3>
+          <p>В разделе <code>Типы встреч</code> можно смотреть список типов, добавлять новый тип, включать или отключать тип встречи, менять длительности, если такая настройка доступна.</p>
+          <div class="note">
+            После изменения расписания или ограничений рекомендуется создать тестовую заявку и проверить, что слоты показываются правильно.
+          </div>
+        </section>
+
+        <section id="bookings">
+          <h2>10. Как смотреть заявки</h2>
+          <p>Откройте раздел заявок или фильтров. Можно смотреть заявки по статусам:</p>
+          <ul>
+            <li>ожидает подтверждения;</li>
+            <li>подтверждена;</li>
+            <li>отклонена;</li>
+            <li>отменена;</li>
+            <li>перенесена;</li>
+            <li>закрыта по TTL.</li>
+          </ul>
+          <p>При проверке заявки обращайте внимание на дату, время <code>МСК</code>, email и статус.</p>
+        </section>
+
+        <section id="diag">
+          <h2>11. Диагностика</h2>
+          <p>Введите команду:</p>
+          <p><code>/diag</code></p>
+          <p>Диагностика показывает только безопасные признаки настройки: <code>configured true</code> или <code>configured false</code>.</p>
+          <div class="warning">
+            Диагностика не должна показывать реальные токены, пароли, секреты, refresh token и значения .env.
+          </div>
+        </section>
+
+        <section id="production">
+          <h2>12. Если бот не отвечает</h2>
+          <p>Проверьте production по инструкции <code>deploy/README.md</code>:</p>
+          <ol>
+            <li>Healthcheck домена.</li>
+            <li>Контейнеры <code>app</code>, <code>postgres</code>, <code>worker</code>.</li>
+            <li>Webhook Telegram.</li>
+            <li>Логи app и worker.</li>
+            <li>Ошибки <code>google_api_error</code>, <code>telegram_api_error</code>, <code>job_failed</code>.</li>
+          </ol>
+          <p>Не выводите значения <code>.env</code> и <code>.env.production</code>.</p>
+        </section>
+
+        <section id="checklist">
+          <h2>13. Быстрый чек-лист администратора</h2>
+          <ul class="checklist">
+            <li>Открыть <code>/admin</code>.</li>
+            <li>Найти новую заявку.</li>
+            <li>Проверить все поля карточки.</li>
+            <li>Подтвердить заявку.</li>
+            <li>Проверить событие в Google Calendar.</li>
+            <li>Проверить email-приглашение.</li>
+            <li>Отменить тестовую встречу.</li>
+            <li>Проверить, что событие календаря отменено.</li>
+            <li>Проверить, что слот снова доступен.</li>
+          </ul>
+        </section>
+
+        <section id="rules">
+          <h2>14. Что нельзя делать</h2>
+          <ul>
+            <li>Нельзя отправлять пользователям токены, пароли и секреты.</li>
+            <li>Нельзя публиковать <code>.env</code> или <code>.env.production</code>.</li>
+            <li>Нельзя подтверждать заявку, если дата, время или email вызывают сомнение.</li>
+            <li>Нельзя считать email доставленным, пока письмо не проверено в почте или календаре.</li>
+            <li>Нельзя удалять события напрямую из Google Calendar без понимания последствий.</li>
+          </ul>
+        </section>
+
+        <p class="footer">Документ не содержит токены, пароли, refresh token и значения .env.</p>
+      </article>
+    </div>
+  </main>
+</body>
+</html>
