@@ -1,3 +1,15 @@
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package*.json ./
+RUN npm install --no-audit --no-fund
+
+COPY frontend/index.html frontend/tsconfig.json frontend/tsconfig.node.json frontend/vite.config.ts ./
+COPY frontend/src ./src
+
+RUN npm run build
+
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -10,6 +22,7 @@ RUN adduser --disabled-password --gecos "" appuser
 
 COPY pyproject.toml README.md alembic.ini ./
 COPY app ./app
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 RUN pip install --upgrade pip && pip install .
 

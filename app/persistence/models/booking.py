@@ -43,6 +43,12 @@ class Booking(UuidPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
         nullable=False,
     )
+    created_source: Mapped[str] = mapped_column(
+        String(50),
+        default="telegram_bot",
+        index=True,
+        nullable=False,
+    )
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     cancellation_reason: Mapped[str | None] = mapped_column(Text)
     reserved_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)

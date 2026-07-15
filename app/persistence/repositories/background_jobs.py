@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.sources import ActionSource
 from app.core.booking import BookingRecord
 from app.core.booking import BookingStatus as CoreBookingStatus
 from app.persistence.models import AuditLog, BackgroundJob, Booking, SlotReservation, User
@@ -183,6 +184,7 @@ class SqlAlchemyBackgroundJobRepository:
             AuditLog(
                 actor_type=AuditActorType.SYSTEM.value,
                 action="booking_expired_by_ttl",
+                source=ActionSource.WORKER.value,
                 entity_type="booking",
                 entity_id=booking_id,
                 payload={},
@@ -257,6 +259,7 @@ def _booking_record(booking: Booking) -> BookingRecord:
         starts_at=booking.starts_at,
         ends_at=booking.ends_at,
         status=CoreBookingStatus(booking.status),
+        created_source=booking.created_source,
         user_comment=booking.user_comment,
         rejection_reason=booking.rejection_reason,
         cancellation_reason=booking.cancellation_reason,

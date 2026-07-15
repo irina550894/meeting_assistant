@@ -222,8 +222,10 @@ GitHub Actions не меняет системный Caddy.
 
 1. Пройдет тесты.
 2. Подключится к VPS.
-3. Пересоберет `app` и `worker`.
-4. Проверит healthcheck.
+3. Соберет Mini App frontend.
+4. Подключится к VPS.
+5. Пересоберет `app` и `worker`.
+6. Проверит healthcheck и `/miniapp/`.
 
 ## 8. Как понять, что deploy прошел успешно
 
@@ -242,8 +244,9 @@ Tests completed, deploy skipped. Configure GitHub Actions secrets to enable auto
 1. `Run lint` - success.
 2. `Run compile check` - success.
 3. `Run tests` - success.
-4. `Upload archive and deploy script` - success.
-5. `Deploy on VPS` - success.
+4. `Build Mini App frontend` - success.
+5. `Upload archive and deploy script` - success.
+6. `Deploy on VPS` - success.
 
 В output deploy должно быть:
 
@@ -257,6 +260,12 @@ deploy_finished commit=<sha>
 
 ```json
 {"status":"ok","service":"meeting-assistant","environment":"production"}
+```
+
+В output deploy также должно быть:
+
+```text
+miniapp_check_ok url=http://127.0.0.1:8010/miniapp/
 ```
 
 ## 9. Что делать при ошибке
@@ -319,6 +328,30 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
 
 Секреты из `.env.production` не выводить.
 
+### 9.5. Mini App не открывается
+
+Проверить на VPS:
+
+```bash
+curl --fail --silent --show-error http://127.0.0.1:8010/miniapp/ >/dev/null
+```
+
+Затем проверить app logs:
+
+```bash
+cd /home/irina/meeting_assistant
+sudo docker compose --project-directory /home/irina/meeting_assistant \
+  -f /home/irina/meeting_assistant/docker-compose.prod.yml \
+  -f /home/irina/meeting_assistant/docker-compose.system-caddy.yml \
+  --env-file /home/irina/meeting_assistant/.env.production \
+  logs --tail=100 app
+```
+
+Ожидаемое событие: `mini_app_frontend_mounted`.
+
+Если есть `mini_app_frontend_dist_missing`, проверить Docker build frontend stage
+и значение `MINI_APP_FRONTEND_DIST_PATH`.
+
 ## 10. Важные ограничения
 
 1. Workflow не хранит и не выводит `.env.production`.
@@ -326,9 +359,11 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
 3. Workflow не запускает Caddy-контейнер.
 4. Workflow не делает backup PostgreSQL.
 5. Workflow деплоит tracked-файлы из Git, как ручной `git archive` deploy.
-6. Если миграции Alembic есть в коде, app выполнит `alembic upgrade head` при
+6. Frontend-зависимости устанавливаются в GitHub Actions и Docker build без
+   записи секретов во frontend.
+7. Если миграции Alembic есть в коде, app выполнит `alembic upgrade head` при
    запуске контейнера.
-7. Если нужен rollback, его нужно делать отдельной процедурой.
+8. Если нужен rollback, его нужно делать отдельной процедурой.
 
 ## 11. Алгоритм rollback вручную
 

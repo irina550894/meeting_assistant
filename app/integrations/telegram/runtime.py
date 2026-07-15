@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from pydantic import SecretStr
 
 from app.core.admin_flow import AdminFlowService
@@ -21,6 +22,7 @@ from app.integrations.google_calendar import (
 )
 from app.integrations.telegram.admin_router import create_admin_router
 from app.integrations.telegram.critical_notifications import notify_critical_admin
+from app.integrations.telegram.keyboards import MINI_APP_BUTTON_TEXT
 from app.integrations.telegram.local_memory import (
     InMemoryRuntimeStore,
     LocalCalendarConfirmationGateway,
@@ -62,6 +64,7 @@ async def build_telegram_runtime(settings) -> TelegramRuntime:
         session=AiohttpSession(timeout=settings.telegram_request_timeout_seconds),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    await _configure_mini_app_menu_button(bot, settings)
     storage = settings.telegram_storage.strip().lower()
     if storage == "postgres":
         store = SqlAlchemyTelegramRuntimeStore(
@@ -190,3 +193,38 @@ def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:
         client_secret=SecretStr(settings.google_oauth_client_secret.get_secret_value()),
     )
     return GoogleCalendarClient(settings=settings, token_provider=lambda: tokens)
+
+
+async def _configure_mini_app_menu_button(bot: Bot, settings) -> None:
+    url = _mini_app_url(settings)
+    if url is None:
+        return
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text=MINI_APP_BUTTON_TEXT,
+                web_app=WebAppInfo(url=url),
+            )
+        )
+        logger.info(
+            "Mini App menu button configured",
+            extra={"event": "mini_app_menu_button_configured"},
+        )
+    except Exception as error:
+        logger.warning(
+            "Mini App menu button setup failed",
+            extra={
+                "event": "mini_app_menu_button_failed",
+                "error_type": type(error).__name__,
+            },
+        )
+
+
+def _mini_app_url(settings) -> str | None:
+    if not settings.mini_app_enabled or not settings.public_base_url:
+        return None
+    base_url = settings.public_base_url.rstrip("/")
+    if not base_url.startswith("https://"):
+        return None
+    public_path = "/" + settings.mini_app_public_path.strip("/")
+    return f"{base_url}{public_path}/"

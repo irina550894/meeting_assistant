@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ассистент встреч - preview</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="top-panel">
+        <div>
+          <p class="eyebrow">Ассистент встреч</p>
+          <h1>Здравствуйте, Ирина</h1>
+        </div>
+        <div class="profile-chip">
+          <span>И</span>
+        </div>
+      </section>
+
+      <div class="notice">
+        Статический preview этапа 8. Пользовательские и админские экраны React будут
+        полностью интерактивны после запуска Vite.
+      </div>
+
+      <section class="metrics-grid" aria-label="Сводка">
+        <article class="metric metric-green">
+          <span>Активные</span>
+          <strong>2</strong>
+        </article>
+        <article class="metric metric-purple">
+          <span>Ожидают</span>
+          <strong>1</strong>
+        </article>
+        <article class="metric metric-peach">
+          <span>Ближайшая</span>
+          <strong>21 июл.</strong>
+        </article>
+      </section>
+
+      <section class="content-panel consent-panel">
+        <div class="booking-icon">
+          <span>✓</span>
+        </div>
+        <h2>Согласие на обработку данных</h2>
+        <p>
+          Для записи на встречу пользователь подтверждает согласие одной кнопкой. Ссылки на
+          документы остаются кликабельными под кнопкой.
+        </p>
+        <button type="button" class="primary-button">Принимаю и продолжаю</button>
+        <div class="legal-links">
+          <a href="#">Согласие на обработку</a>
+          <a href="#">Политика конфиденциальности</a>
+        </div>
+      </section>
+
+      <section class="content-panel" style="margin-top: 16px">
+        <div class="panel-header">
+          <h2>Новая встреча</h2>
+          <span>3 шага</span>
+        </div>
+        <div class="stepper">
+          <button type="button" class="step step-active">1</button>
+          <button type="button" class="step">2</button>
+          <button type="button" class="step">3</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Имя</span>
+            <input value="Ирина" readonly />
+          </label>
+          <label>
+            <span>Email</span>
+            <input value="client@example.com" readonly />
+          </label>
+          <label>
+            <span>Тип встречи</span>
+            <select>
+              <option>Консультация</option>
+              <option>Диагностика</option>
+            </select>
+          </label>
+          <label>
+            <span>Длительность</span>
+            <select>
+              <option>60 минут</option>
+              <option>90 минут</option>
+            </select>
+          </label>
+          <label class="wide-field">
+            <span>Комментарий</span>
+            <textarea readonly>Обсудить проект</textarea>
+          </label>
+        </div>
+
+        <div class="date-strip" style="margin-top: 16px">
+          <button type="button" class="date-pill date-pill-active">
+            <span>пн</span>
+            <strong>20</strong>
+          </button>
+          <button type="button" class="date-pill">
+            <span>вт</span>
+            <strong>21</strong>
+          </button>
+          <button type="button" class="date-pill">
+            <span>ср</span>
+            <strong>22</strong>
+          </button>
+          <button type="button" class="date-pill">
+            <span>чт</span>
+            <strong>23</strong>
+          </button>
+        </div>
+        <div class="slot-grid">
+          <button type="button" class="slot-button slot-button-active">10:00</button>
+          <button type="button" class="slot-button">11:30</button>
+          <button type="button" class="slot-button">14:00</button>
+          <button type="button" class="slot-button">16:30</button>
+        </div>
+
+        <div class="review-card" style="margin-top: 16px">
+          <div class="review-row">
+            <span>Тип</span>
+            <strong>Консультация</strong>
+          </div>
+          <div class="review-row">
+            <span>Время</span>
+            <strong>20 июл., 10:00</strong>
+          </div>
+          <button type="button" class="primary-button">Отправить заявку</button>
+        </div>
+      </section>
+
+      <section class="content-panel" style="margin-top: 16px">
+        <div class="panel-header">
+          <h2>Мои заявки</h2>
+          <span>2</span>
+        </div>
+        <div class="timeline-list">
+          <article class="booking-row">
+            <div>
+              <strong>Ожидает</strong>
+              <span>21 июл., 10:00</span>
+            </div>
+            <span>●</span>
+          </article>
+          <article class="booking-row">
+            <div>
+              <strong>Подтверждена</strong>
+              <span>23 июл., 15:30</span>
+            </div>
+            <a href="https://meet.google.com/" target="_blank" rel="noreferrer">Meet</a>
+          </article>
+        </div>
+        <div class="detail-panel">
+          <div class="panel-header">
+            <h2>Карточка заявки</h2>
+            <span>Подтверждена</span>
+          </div>
+          <div class="review-row">
+            <span>Дата</span>
+            <strong>23 июл., 15:30</strong>
+          </div>
+          <div class="review-row">
+            <span>Длительность</span>
+            <strong>60 минут</strong>
+          </div>
+          <div class="action-row">
+            <button type="button" class="danger-button">Отменить</button>
+            <button type="button" class="secondary-button">Перенести</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-panel" style="margin-top: 16px">
+        <div class="panel-header">
+          <h2>Админ</h2>
+          <span>Mini App</span>
+        </div>
+        <div class="admin-tabs">
+          <button type="button" class="admin-tab admin-tab-active">Сводка</button>
+          <button type="button" class="admin-tab">Заявки</button>
+          <button type="button" class="admin-tab">План</button>
+          <button type="button" class="admin-tab">Расписание</button>
+          <button type="button" class="admin-tab">Типы</button>
+        </div>
+        <div class="admin-grid">
+          <article class="admin-tile">
+            <span>Ожидают</span>
+            <strong>1</strong>
+          </article>
+          <article class="admin-tile">
+            <span>Подтверждены</span>
+            <strong>1</strong>
+          </article>
+          <article class="admin-tile">
+            <span>Переносы</span>
+            <strong>0</strong>
+          </article>
+        </div>
+        <select class="admin-filter" style="margin-top: 14px">
+          <option>Все заявки</option>
+          <option>Ожидают</option>
+          <option>Подтверждены</option>
+        </select>
+        <div class="timeline-list">
+          <article class="booking-row">
+            <div>
+              <strong>Анна Клиентова</strong>
+              <span>Ожидает · 21 июл., 10:00</span>
+            </div>
+            <span>Консультация</span>
+          </article>
+        </div>
+        <div class="detail-panel">
+          <div class="panel-header">
+            <h2>Заявка</h2>
+            <span>Ожидает</span>
+          </div>
+          <div class="review-row">
+            <span>Клиент</span>
+            <strong>Анна Клиентова</strong>
+          </div>
+          <div class="review-row">
+            <span>Email</span>
+            <strong>anna@example.com</strong>
+          </div>
+          <label class="wide-field">
+            <span>Ссылка на встречу</span>
+            <input value="https://meet.google.com/" readonly />
+          </label>
+          <div class="action-row">
+            <button type="button" class="secondary-button">Подтвердить</button>
+            <button type="button" class="danger-button">Отклонить</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-panel" style="margin-top: 16px">
+        <div class="panel-header">
+          <h2>Расписание</h2>
+          <span>Europe/Moscow</span>
+        </div>
+        <div class="admin-grid">
+          <article class="admin-tile">
+            <span>Горизонт</span>
+            <strong>21 дней</strong>
+          </article>
+          <article class="admin-tile">
+            <span>Шаг слота</span>
+            <strong>30 мин</strong>
+          </article>
+          <article class="admin-tile">
+            <span>Буфер</span>
+            <strong>15 мин</strong>
+          </article>
+        </div>
+        <div class="detail-panel">
+          <div class="panel-header">
+            <h2>Закрытый день</h2>
+            <span>Добавить</span>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>Дата</span>
+              <input type="date" value="2026-07-22" readonly />
+            </label>
+            <label class="wide-field">
+              <span>Комментарий</span>
+              <textarea readonly>Личный день без встреч</textarea>
+            </label>
+            <button type="button" class="primary-button">Добавить ограничение</button>
+          </div>
+        </div>
+        <div class="timeline-list">
+          <article class="booking-row">
+            <div>
+              <strong>22 июл.</strong>
+              <span>Личный день без встреч</span>
+            </div>
+            <button type="button" class="danger-button compact-action">Удалить</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-panel" style="margin-top: 16px">
+        <div class="panel-header">
+          <h2>Типы встреч</h2>
+          <span>MVP</span>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Название</span>
+            <input value="Разбор проекта" readonly />
+          </label>
+          <label>
+            <span>Длительности через запятую</span>
+            <input value="30,60" readonly />
+          </label>
+          <button type="button" class="primary-button">Добавить тип встречи</button>
+        </div>
+        <div class="timeline-list">
+          <article class="booking-row">
+            <div>
+              <strong>Консультация</strong>
+              <span>30, 60 минут</span>
+            </div>
+            <button type="button" class="secondary-button compact-action">Активен</button>
+          </article>
+          <article class="booking-row">
+            <div>
+              <strong>Диагностика</strong>
+              <span>60 минут</span>
+            </div>
+            <button type="button" class="danger-button compact-action">Выключен</button>
+          </article>
+        </div>
+      </section>
+
+      <div class="toast toast-success">
+        <span>✓</span>
+        <span>Заявка создана</span>
+      </div>
+
+      <nav class="bottom-nav" aria-label="Навигация Mini App">
+        <button type="button" class="nav-item nav-item-active">
+          <span>⌂</span>
+          <span>Запись</span>
+        </button>
+        <button type="button" class="nav-item">
+          <span>□</span>
+          <span>Заявки</span>
+        </button>
+        <button type="button" class="nav-item">
+          <span>◷</span>
+          <span>Календарь</span>
+        </button>
+        <button type="button" class="nav-item">
+          <span>⚙</span>
+          <span>Админ</span>
+        </button>
+        <button type="button" class="nav-item">
+          <span>○</span>
+          <span>Профиль</span>
+        </button>
+      </nav>
+    </main>
+  </body>
+</html>

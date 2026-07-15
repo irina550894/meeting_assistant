@@ -361,6 +361,7 @@ async def _upsert_booking(session: AsyncSession, booking: BookingRecord) -> None
     model.ends_at = booking.ends_at
     model.user_comment = booking.user_comment
     model.status = booking.status.value
+    model.created_source = booking.created_source
     model.rejection_reason = booking.rejection_reason
     model.cancellation_reason = booking.cancellation_reason
     model.reserved_until = booking.reserved_until
@@ -407,6 +408,7 @@ async def _insert_audit_entries(session: AsyncSession, entries: list[AuditEntry]
                 actor_type=entry.actor_type,
                 actor_user_id=entry.actor_user_id,
                 action=entry.action,
+                source=entry.source,
                 entity_type=entry.entity_type,
                 entity_id=entry.entity_id,
                 payload=entry.payload,
@@ -580,6 +582,7 @@ def _booking_record(booking: Booking) -> BookingRecord:
         starts_at=booking.starts_at,
         ends_at=booking.ends_at,
         status=BookingStatus(booking.status),
+        created_source=booking.created_source,
         user_comment=booking.user_comment,
         rejection_reason=booking.rejection_reason,
         cancellation_reason=booking.cancellation_reason,

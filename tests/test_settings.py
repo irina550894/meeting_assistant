@@ -24,3 +24,18 @@ def test_settings_expose_storage_mode_without_secrets() -> None:
 
     assert settings.telegram_storage == "postgres"
     assert settings.safe_summary["telegram_storage"] == "postgres"
+
+
+def test_settings_expose_mini_app_public_flags_without_secrets() -> None:
+    settings = Settings(
+        mini_app_enabled=True,
+        mini_app_public_path="/miniapp",
+        mini_app_frontend_dist_path="frontend/dist",
+    )
+
+    assert settings.mini_app_enabled is True
+    assert settings.mini_app_public_path == "/miniapp"
+    assert settings.mini_app_frontend_dist_path == "frontend/dist"
+    assert settings.safe_summary["mini_app_enabled"] is True
+    assert settings.safe_summary["mini_app_public_path"] == "/miniapp"
+    assert settings.safe_summary["mini_app_frontend_dist_path"] == "frontend/dist"

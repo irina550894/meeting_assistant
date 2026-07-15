@@ -7,6 +7,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 
 from app.core.booking import BookingRecord, BookingStatus, MeetingType
@@ -21,14 +22,28 @@ from app.integrations.telegram.status_labels import booking_status_label
 BACK = "Назад"
 CANCEL = "Отмена"
 MENU = "Меню"
+MINI_APP_BUTTON_TEXT = "Открыть Mini App"
 
 
-def main_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def main_menu_keyboard(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
+    rows = []
+    if mini_app_url:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=MINI_APP_BUTTON_TEXT,
+                    web_app=WebAppInfo(url=mini_app_url),
+                )
+            ]
+        )
+    rows.extend(
+        [
             [InlineKeyboardButton(text="Записаться", callback_data="uf:book")],
             [InlineKeyboardButton(text="Мои заявки", callback_data="uf:my")],
         ]
+    )
+    return InlineKeyboardMarkup(
+        inline_keyboard=rows,
     )
 
 
@@ -38,6 +53,7 @@ def consent_keyboard(
     policy_checked: bool,
     consent_url: str | None,
     policy_url: str | None,
+    mini_app_url: str | None = None,
 ) -> InlineKeyboardMarkup:
     personal_prefix = "[x]" if personal_data_checked else "[ ]"
     policy_prefix = "[x]" if policy_checked else "[ ]"
@@ -61,6 +77,15 @@ def consent_keyboard(
         )
     if policy_url:
         rows.append([InlineKeyboardButton(text="Открыть политику", url=policy_url)])
+    if mini_app_url:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=MINI_APP_BUTTON_TEXT,
+                    web_app=WebAppInfo(url=mini_app_url),
+                )
+            ]
+        )
     rows.append(
         [InlineKeyboardButton(text="Продолжить", callback_data="uf:consent:accept")]
     )

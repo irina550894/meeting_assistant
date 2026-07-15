@@ -20,6 +20,12 @@ class AuditLog(UuidPrimaryKeyMixin, Base):
     )
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     action: Mapped[str] = mapped_column(String(150), index=True, nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(50),
+        default="telegram_bot",
+        index=True,
+        nullable=False,
+    )
     entity_type: Mapped[str | None] = mapped_column(String(100))
     entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)

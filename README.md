@@ -139,6 +139,15 @@ TELEGRAM_STORAGE=postgres
 - App port: `127.0.0.1:8010 -> container 8000`
 - HTTPS reverse proxy: системный Caddy на VPS
 - Domain: `calendar.finforbiz.pro`
+- Telegram Mini App: `https://calendar.finforbiz.pro/miniapp/`
+
+Mini App является дополнением к Telegram-боту. API Mini App расположен под
+`/api/miniapp`, frontend собирается в Docker через Vite и отдается FastAPI из
+`MINI_APP_FRONTEND_DIST_PATH`. Открытие из Telegram выполняется через inline-кнопку
+`Открыть Mini App` в меню бота и через постоянную Telegram menu button, если
+настроен HTTPS `PUBLIC_BASE_URL`.
+
+Ручная проверка Mini App после deploy описана в `UAT_Telegram_Mini_App.md`.
 
 Основная команда запуска на VPS:
 
@@ -196,6 +205,12 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
 Полезные события:
 
 - `healthcheck_ok` - приложение отвечает.
+- `mini_app_menu_button_configured` - Telegram menu button Mini App настроена.
+- `mini_app_menu_button_failed` - Telegram menu button не удалось настроить, бот
+  продолжает запуск.
+- `mini_app_frontend_mounted` - frontend Mini App найден и подключен.
+- `mini_app_frontend_dist_missing` - frontend dist не найден, `/miniapp/` не
+  подключен.
 - `telegram_webhook_configured` - Telegram webhook установлен.
 - `worker_started` - worker запущен.
 - `background_jobs_recovered` - фоновые задачи восстановлены.
@@ -211,6 +226,8 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
   календаря не создается или не отменяется.
 - Telegram webhook не работает: нет входящих webhook-событий, есть ошибки
   Telegram API, healthcheck при этом может оставаться зеленым.
+- Mini App не открывается: проверить `/miniapp/`, наличие события
+  `mini_app_frontend_mounted`, Docker build frontend stage и Caddy reverse proxy.
 - Worker не выполняет задачи: нет `worker_started`, `job_started` или
   `job_succeeded`, либо контейнер `worker` не в статусе `Up`.
 
@@ -223,7 +240,8 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
   доменную доставляемость.
 - Резервные копии базы данных не входят в MVP.
 - Лимит встреч в день в MVP выключен, но модель допускает будущую настройку.
-- Telegram Mini App не входит в MVP; backend подготовлен к будущему API.
+- Telegram Mini App находится в разработке и отдается по `/miniapp/`; перед
+  production-включением нужна ручная проверка в Telegram.
 - Production использует системный Caddy VPS, потому что на сервере уже работают
   другие домены. Caddy-контейнер из `docker-compose.prod.yml` в текущей схеме не
   запускается.
@@ -234,7 +252,6 @@ sudo docker compose --project-directory /home/irina/meeting_assistant \
 
 - Отдельный email-провайдер или SMTP для уведомлений вне Google Calendar.
 - Email-verification сервис для более строгой проверки mailbox.
-- Telegram Mini App поверх текущего FastAPI/backend-ядра.
 - Админ-экран для просмотра audit-log и ошибок без SSH.
 - Настраиваемый дневной лимит встреч из админ-интерфейса.
 

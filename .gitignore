@@ -8,6 +8,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
+node_modules/
 htmlcov/
 .coverage
 dist/

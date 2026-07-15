@@ -61,6 +61,7 @@ def test_runtime_store_maps_booking_with_reservation() -> None:
         starts_at=starts_at,
         ends_at=starts_at + timedelta(hours=1),
         status=BookingStatus.PENDING.value,
+        created_source="mini_app",
         reserved_until=starts_at - timedelta(hours=2),
         reservation=reservation,
     )
@@ -69,6 +70,7 @@ def test_runtime_store_maps_booking_with_reservation() -> None:
 
     assert record.id == booking_id
     assert record.status == BookingStatus.PENDING
+    assert record.created_source == "mini_app"
     assert record.reservation is not None
     assert record.reservation.booking_id == booking_id
 

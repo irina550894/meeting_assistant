@@ -74,6 +74,7 @@ class BookingRecord:
     starts_at: datetime
     ends_at: datetime
     status: BookingStatus
+    created_source: str = "telegram_bot"
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     user_comment: str | None = None
     rejection_reason: str | None = None
@@ -99,6 +100,7 @@ class AuditEntry:
     entity_type: str | None
     entity_id: uuid.UUID | None
     created_at: datetime
+    source: str = "telegram_bot"
     actor_user_id: uuid.UUID | None = None
     payload: dict[str, object] = field(default_factory=dict)
     error_type: str | None = None

@@ -53,17 +53,17 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
         if not user.has_personal_data_consent:
             await _show_consent(message, state, deps)
             return
-        await _show_menu(message, state)
+        await _show_menu(message, state, deps)
 
     @router.callback_query(F.data == "uf:menu")
     async def menu_callback(callback: CallbackQuery, state: FSMContext) -> None:
         await state.clear()
         await callback.answer()
-        await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+        await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=_main_menu_keyboard(deps))
 
     @router.message(F.text == MENU)
     async def menu_message(message: Message, state: FSMContext) -> None:
-        await _show_menu(message, state)
+        await _show_menu(message, state, deps)
 
     @router.callback_query(F.data.startswith("uf:consent:"))
     async def consent_callback(callback: CallbackQuery, state: FSMContext) -> None:
@@ -99,7 +99,11 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             await deps.bookings.save_audit_entries([audit])
             await state.clear()
             await callback.answer()
-            await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+            await _edit_or_answer(
+                callback,
+                messages.MAIN_MENU,
+                reply_markup=_main_menu_keyboard(deps),
+            )
             return
 
         await state.update_data(personal_data_checked=personal, policy_checked=policy)
@@ -112,6 +116,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
                 policy_checked=policy,
                 consent_url=deps.settings.personal_data_consent_url,
                 policy_url=deps.settings.personal_data_policy_url,
+                mini_app_url=_mini_app_url(deps.settings),
             ),
         )
 
@@ -316,7 +321,7 @@ def create_user_router(deps: UserFlowDependencies) -> Router:
             await _edit_or_answer(
                 callback,
                 messages.BOOKINGS_EMPTY,
-                reply_markup=main_menu_keyboard(),
+                reply_markup=_main_menu_keyboard(deps),
             )
             return
         await _edit_or_answer(
@@ -439,13 +444,14 @@ async def _show_consent(message: Message, state: FSMContext, deps: UserFlowDepen
             policy_checked=False,
             consent_url=deps.settings.personal_data_consent_url,
             policy_url=deps.settings.personal_data_policy_url,
+            mini_app_url=_mini_app_url(deps.settings),
         ),
     )
 
 
-async def _show_menu(message: Message, state: FSMContext) -> None:
+async def _show_menu(message: Message, state: FSMContext, deps: UserFlowDependencies) -> None:
     await state.clear()
-    await message.answer(messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+    await message.answer(messages.MAIN_MENU, reply_markup=_main_menu_keyboard(deps))
 
 
 async def _begin_booking(
@@ -465,7 +471,7 @@ async def _begin_booking(
             "User cannot start booking flow",
             extra={"event": "user_flow_start_denied", "rule": error.rule},
         )
-        await _send(target, _business_error_text(error), reply_markup=main_menu_keyboard())
+        await _send(target, _business_error_text(error), reply_markup=_main_menu_keyboard(deps))
         return
 
     draft = BookingDraft(full_name=user.full_name, email=user.email)
@@ -569,7 +575,7 @@ async def _go_back(
         await state.set_state(UserBookingStates.comment)
         await _edit_or_answer(callback, messages.COMMENT, reply_markup=comment_keyboard())
     else:
-        await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+        await _edit_or_answer(callback, messages.MAIN_MENU, reply_markup=_main_menu_keyboard(deps))
 
 
 async def _go_back_message(
@@ -588,7 +594,7 @@ async def _go_back_message(
         await _show_dates(message, state, deps)
     else:
         await state.clear()
-        await message.answer(messages.MAIN_MENU, reply_markup=main_menu_keyboard())
+        await message.answer(messages.MAIN_MENU, reply_markup=_main_menu_keyboard(deps))
 
 
 async def _ensure_user(message: Message, deps: UserFlowDependencies) -> UserProfile:
@@ -706,6 +712,20 @@ def _business_error_text(error: Exception) -> str:
         if error.rule == "personal_data_consent_required":
             return messages.CONSENT_REQUIRED
     return messages.ACTION_UNAVAILABLE
+
+
+def _main_menu_keyboard(deps: UserFlowDependencies) -> InlineKeyboardMarkup:
+    return main_menu_keyboard(mini_app_url=_mini_app_url(deps.settings))
+
+
+def _mini_app_url(settings) -> str | None:
+    if not settings.mini_app_enabled or not settings.public_base_url:
+        return None
+    base_url = settings.public_base_url.rstrip("/")
+    if not base_url.startswith("https://"):
+        return None
+    public_path = "/" + settings.mini_app_public_path.strip("/")
+    return f"{base_url}{public_path}/"
 
 
 def _review_text(draft: BookingDraft, meeting_type: MeetingType | None) -> str:

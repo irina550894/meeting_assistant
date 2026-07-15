@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     telegram_request_timeout_seconds: int = 10
     telegram_storage: str = "memory"
 
+    mini_app_enabled: bool = True
+    mini_app_public_path: str = "/miniapp"
+    mini_app_auth_max_age_seconds: int = 86400
+    mini_app_session_ttl_seconds: int = 86400
+    mini_app_cookie_name: str = "meeting_assistant_mini_app_session"
+    mini_app_cookie_secure: bool = False
+    mini_app_cookie_samesite: str = "lax"
+    mini_app_frontend_dist_path: str = "frontend/dist"
+
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "meeting_assistant"
@@ -98,6 +107,9 @@ class Settings(BaseSettings):
             "telegram_admin_id_configured": self.telegram_admin_id is not None,
             "telegram_bot_token_configured": self.telegram_bot_token is not None,
             "telegram_storage": self.telegram_storage,
+            "mini_app_enabled": self.mini_app_enabled,
+            "mini_app_public_path": self.mini_app_public_path,
+            "mini_app_frontend_dist_path": self.mini_app_frontend_dist_path,
             "database_configured": bool(self.database_url),
             "google_oauth_configured": bool(
                 self.google_oauth_client_id and self.google_oauth_client_secret

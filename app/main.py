@@ -1,11 +1,18 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.integrations.telegram.runtime import build_telegram_runtime
 from app.interfaces.http.routes.google_oauth import router as google_oauth_router
 from app.interfaces.http.routes.health import router as health_router
+from app.interfaces.http.routes.miniapp_admin import router as miniapp_admin_router
+from app.interfaces.http.routes.miniapp_analytics import router as miniapp_analytics_router
+from app.interfaces.http.routes.miniapp_auth import router as miniapp_auth_router
+from app.interfaces.http.routes.miniapp_user import router as miniapp_user_router
 from app.interfaces.http.routes.telegram_webhook import router as telegram_webhook_router
 from app.logging.config import (
     configure_logging,
@@ -72,7 +79,12 @@ def create_app() -> FastAPI:
     )
     application.include_router(health_router)
     application.include_router(google_oauth_router)
+    application.include_router(miniapp_auth_router)
+    application.include_router(miniapp_user_router)
+    application.include_router(miniapp_admin_router)
+    application.include_router(miniapp_analytics_router)
     application.include_router(telegram_webhook_router)
+    configure_mini_app_frontend(application, settings)
 
     @application.middleware("http")
     async def operation_id_middleware(request: Request, call_next):
@@ -86,6 +98,45 @@ def create_app() -> FastAPI:
         return response
 
     return application
+
+
+def configure_mini_app_frontend(application: FastAPI, settings) -> None:
+    if not settings.mini_app_enabled:
+        return
+
+    frontend_dist_path = Path(settings.mini_app_frontend_dist_path)
+    if not frontend_dist_path.is_absolute():
+        frontend_dist_path = Path.cwd() / frontend_dist_path
+
+    if not (frontend_dist_path / "index.html").is_file():
+        logger.info(
+            "Mini App frontend dist not mounted",
+            extra={
+                "event": "mini_app_frontend_dist_missing",
+                "path": str(frontend_dist_path),
+            },
+        )
+        return
+
+    public_path = "/" + settings.mini_app_public_path.strip("/")
+
+    @application.get(public_path, include_in_schema=False)
+    async def mini_app_frontend_redirect() -> RedirectResponse:
+        return RedirectResponse(f"{public_path}/")
+
+    application.mount(
+        public_path,
+        StaticFiles(directory=frontend_dist_path, html=True),
+        name="miniapp-frontend",
+    )
+    logger.info(
+        "Mini App frontend mounted",
+        extra={
+            "event": "mini_app_frontend_mounted",
+            "public_path": public_path,
+            "path": str(frontend_dist_path),
+        },
+    )
 
 
 app = create_app()

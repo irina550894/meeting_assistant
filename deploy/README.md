@@ -9,6 +9,8 @@
 - Docker services: `postgres`, `app`, `worker`
 - App binding: `127.0.0.1:8010 -> container 8000`
 - HTTPS reverse proxy: system Caddy on VPS
+- Mini App frontend: `https://calendar.finforbiz.pro/miniapp/`
+- Mini App API: `https://calendar.finforbiz.pro/api/miniapp/...`
 - Compose files:
   - `docker-compose.prod.yml`
   - `docker-compose.system-caddy.yml`
@@ -44,7 +46,11 @@ Required values:
 - `DEFAULT_MEETING_URL`
 - `PERSONAL_DATA_CONSENT_URL`
 - `PERSONAL_DATA_POLICY_URL`
+- `MINI_APP_FRONTEND_DIST_PATH`
 - Google OAuth and Calendar values.
+
+Mini App button in Telegram is enabled only when `MINI_APP_ENABLED=true` and
+`PUBLIC_BASE_URL` starts with `https://`.
 
 If you need to verify environment readiness, report only configured true/false.
 
@@ -82,6 +88,10 @@ Check Caddy status:
 sudo systemctl status caddy
 ```
 
+No separate Caddy route is required for `/miniapp/`: system Caddy proxies the
+whole domain to FastAPI, and FastAPI serves the built Vite files from
+`MINI_APP_FRONTEND_DIST_PATH`.
+
 ## Checks
 
 Show containers:
@@ -104,6 +114,7 @@ Open:
 
 ```text
 https://calendar.finforbiz.pro/health
+https://calendar.finforbiz.pro/miniapp/
 ```
 
 Expected response:
@@ -113,6 +124,10 @@ Expected response:
 ```
 
 Then write `/start` to the Telegram bot and check the full user/admin flow.
+
+Expected Mini App response: HTML page with the Mini App shell.
+
+Detailed manual UAT checklist: `UAT_Telegram_Mini_App.md`.
 
 ## Logs
 
@@ -150,6 +165,10 @@ Useful events:
 
 - `production_app_started`
 - `telegram_webhook_configured`
+- `mini_app_menu_button_configured`
+- `mini_app_menu_button_failed`
+- `mini_app_frontend_mounted`
+- `mini_app_frontend_dist_missing`
 - `healthcheck_ok`
 - `worker_started`
 - `background_jobs_recovered`
@@ -205,13 +224,16 @@ updates.
 2. Confirm the response contains `"status":"ok"`.
 3. Run `docker compose ps` command from this file.
 4. Confirm `app`, `postgres`, `worker` are up.
-5. Write `/start` to the bot.
-6. Create a booking as a user.
-7. Confirm it as admin.
-8. Check Telegram notifications for user and admin.
-9. Check Google Calendar event.
-10. Check Google Calendar email invitation, including spam.
-11. Cancel the meeting and confirm the calendar event is cancelled.
+5. Open `https://calendar.finforbiz.pro/miniapp/`.
+6. Confirm the Mini App shell opens.
+7. Write `/start` to the bot.
+8. Confirm the `Открыть Mini App` button is visible.
+9. Create a booking as a user.
+10. Confirm it as admin.
+11. Check Telegram notifications for user and admin.
+12. Check Google Calendar event.
+13. Check Google Calendar email invitation, including spam.
+14. Cancel the meeting and confirm the calendar event is cancelled.
 
 ## Notes
 

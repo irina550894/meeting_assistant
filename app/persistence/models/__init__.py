@@ -3,6 +3,8 @@ from app.persistence.models.background_job import BackgroundJob
 from app.persistence.models.base import Base
 from app.persistence.models.booking import Booking
 from app.persistence.models.meeting_type import MeetingType
+from app.persistence.models.mini_app import MiniAppSession
+from app.persistence.models.mini_app_event import MiniAppEvent
 from app.persistence.models.notification import NotificationLog
 from app.persistence.models.oauth import GoogleOAuthToken
 from app.persistence.models.reservation import SlotReservation
@@ -16,6 +18,8 @@ __all__ = [
     "Booking",
     "GoogleOAuthToken",
     "MeetingType",
+    "MiniAppEvent",
+    "MiniAppSession",
     "NotificationLog",
     "ScheduleRestriction",
     "ScheduleSettings",
