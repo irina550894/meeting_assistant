@@ -359,6 +359,76 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.date-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.date-view-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-strong);
+}
+
+.date-view-button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.date-view-button-active {
+  background: var(--purple);
+  color: #ffffff;
+}
+
+.date-window-actions {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-strong);
+  color: var(--purple);
+}
+
+.icon-button:disabled,
+.date-view-button:disabled {
+  opacity: 0.45;
+}
+
+.date-strip-month {
+  max-height: 324px;
+  overflow-y: auto;
+  padding-right: 2px;
+  padding-bottom: 76px;
+}
+
+.date-strip-week {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.date-strip-day {
+  grid-template-columns: 1fr;
+}
+
 .date-pill {
   display: grid;
   place-items: center;
@@ -377,6 +447,17 @@ button:disabled {
 .date-pill-active {
   background: var(--peach);
   color: var(--purple);
+}
+
+.limit-note {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f6b8aa;
+  color: #2b2147;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .slot-grid {
@@ -735,6 +816,19 @@ button:disabled {
   }
 
   .date-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .date-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .date-window-actions {
+    justify-content: flex-end;
+  }
+
+  .date-strip-week {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

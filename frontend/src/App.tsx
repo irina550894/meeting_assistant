@@ -1,6 +1,8 @@
 import {
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   FileText,
   LayoutDashboard,
@@ -62,6 +64,7 @@ import type {
 
 type TabId = "home" | "bookings" | "calendar" | "admin" | "profile";
 type FormStep = "details" | "slot" | "review";
+type DateViewMode = "month" | "week" | "day";
 type ToastTone = "success" | "error" | "info";
 type Toast = { tone: ToastTone; text: string } | null;
 type AdminStatusFilter = "" | "pending" | "confirmed" | "reschedule_requested" | "rejected";
@@ -92,6 +95,8 @@ const tabs: Tab[] = [
   { id: "admin", label: "Админ", icon: ShieldCheck, adminOnly: true },
   { id: "profile", label: "Профиль", icon: UserRound },
 ];
+
+const MAX_ACTIVE_BOOKINGS = 2;
 
 const previewUser: MiniAppUser = {
   id: "preview",
@@ -632,6 +637,7 @@ export function App() {
                 meetingTypes={meetingTypes}
                 availableDates={availableDates}
                 slots={slots}
+                activeBookingsCount={activeBookings(bookings)}
                 onChange={setForm}
                 onStepChange={setFormStep}
                 onSubmit={() => void submitBooking()}
@@ -778,6 +784,7 @@ function BookingForm({
   meetingTypes,
   availableDates,
   slots,
+  activeBookingsCount,
   onChange,
   onStepChange,
   onSubmit,
@@ -788,12 +795,28 @@ function BookingForm({
   meetingTypes: MiniAppMeetingType[];
   availableDates: string[];
   slots: MiniAppSlot[];
+  activeBookingsCount: number;
   onChange: (next: BookingFormState) => void;
   onStepChange: (step: FormStep) => void;
   onSubmit: () => void;
 }) {
   const selectedMeetingType = meetingTypes.find((item) => item.id === form.meetingTypeId);
   const selected = selectedSlot(form.slotKey, slots);
+  const [dateView, setDateView] = useState<DateViewMode>("week");
+  const activeLimitReached = activeBookingsCount >= MAX_ACTIVE_BOOKINGS && !form.previousBookingId;
+  const visibleDates = useMemo(
+    () => datesForView(availableDates, dateView, form.date),
+    [availableDates, dateView, form.date],
+  );
+  const canMoveDatesBack = canMoveDateWindow(availableDates, dateView, form.date, -1);
+  const canMoveDatesForward = canMoveDateWindow(availableDates, dateView, form.date, 1);
+
+  function moveDateWindow(direction: -1 | 1) {
+    const nextDate = nextDateForView(availableDates, dateView, form.date, direction);
+    if (nextDate) {
+      onChange({ ...form, date: nextDate, slotKey: "" });
+    }
+  }
 
   return (
     <>
@@ -893,8 +916,44 @@ function BookingForm({
 
       {formStep === "slot" ? (
         <>
-          <div className="date-strip">
-            {availableDates.map((date) => (
+          <div className="date-toolbar">
+            <div className="date-view-switch" aria-label="Режим выбора даты">
+              {(["month", "week", "day"] as DateViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={dateView === mode ? "date-view-button date-view-button-active" : "date-view-button"}
+                  onClick={() => setDateView(mode)}
+                >
+                  {dateViewLabel(mode)}
+                </button>
+              ))}
+            </div>
+            {dateView !== "month" ? (
+              <div className="date-window-actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  disabled={!canMoveDatesBack}
+                  onClick={() => moveDateWindow(-1)}
+                  aria-label="Предыдущий период"
+                >
+                  <ChevronLeft size={18} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  disabled={!canMoveDatesForward}
+                  onClick={() => moveDateWindow(1)}
+                  aria-label="Следующий период"
+                >
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className={`date-strip date-strip-${dateView}`}>
+            {visibleDates.map((date) => (
               <button
                 key={date}
                 type="button"
@@ -906,6 +965,9 @@ function BookingForm({
               </button>
             ))}
           </div>
+          {!availableDates.length ? (
+            <p className="panel-copy">Нет доступных дат для выбранного типа встречи.</p>
+          ) : null}
           <div className="slot-grid">
             {slots.map((slot) => {
               const key = slotKey(slot);
@@ -936,12 +998,17 @@ function BookingForm({
 
       {formStep === "review" ? (
         <div className="review-card">
+          {activeLimitReached ? (
+            <p className="limit-note">
+              У вас уже {MAX_ACTIVE_BOOKINGS} активные заявки. Чтобы создать новую, отмените или дождитесь завершения одной из текущих.
+            </p>
+          ) : null}
           <ReviewRow label="Имя" value={form.fullName} />
           <ReviewRow label="Email" value={form.email} />
           <ReviewRow label="Тип" value={selectedMeetingType?.name ?? "Не выбран"} />
           <ReviewRow label="Время" value={selected ? dateTimeLabel(selected.starts_at) : "Не выбрано"} />
           <ReviewRow label="Комментарий" value={form.comment || "Без комментария"} />
-          <button type="button" className="primary-button" disabled={isBusy} onClick={onSubmit}>
+          <button type="button" className="primary-button" disabled={isBusy || activeLimitReached} onClick={onSubmit}>
             {isBusy ? "Отправляем..." : "Отправить заявку"}
           </button>
         </div>
@@ -1659,6 +1726,62 @@ function ToastMessage({ toast }: { toast: NonNullable<Toast> }) {
   );
 }
 
+function dateViewLabel(mode: DateViewMode): string {
+  const labels: Record<DateViewMode, string> = {
+    month: "Месяц",
+    week: "Неделя",
+    day: "День",
+  };
+  return labels[mode];
+}
+
+function datesForView(dates: string[], mode: DateViewMode, selectedDate: string): string[] {
+  if (mode === "month") {
+    return dates;
+  }
+
+  if (!dates.length) {
+    return [];
+  }
+
+  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const anchorIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+  if (mode === "day") {
+    return [dates[anchorIndex]];
+  }
+
+  const weekStart = Math.floor(anchorIndex / 7) * 7;
+  return dates.slice(weekStart, weekStart + 7);
+}
+
+function canMoveDateWindow(
+  dates: string[],
+  mode: DateViewMode,
+  selectedDate: string,
+  direction: -1 | 1,
+): boolean {
+  return Boolean(nextDateForView(dates, mode, selectedDate, direction));
+}
+
+function nextDateForView(
+  dates: string[],
+  mode: DateViewMode,
+  selectedDate: string,
+  direction: -1 | 1,
+): string | null {
+  if (!dates.length || mode === "month") {
+    return null;
+  }
+
+  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const anchorIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  const offset = mode === "week" ? 7 : 1;
+  const nextIndex = Math.min(Math.max(anchorIndex + offset * direction, 0), dates.length - 1);
+
+  return nextIndex === anchorIndex ? null : dates[nextIndex];
+}
+
 function selectedSlot(key: string, slots: MiniAppSlot[]): MiniAppSlot | null {
   return slots.find((slot) => slotKey(slot) === key) ?? null;
 }
@@ -1756,7 +1879,20 @@ function weekdayName(weekday: number): string {
 }
 
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "Не удалось выполнить действие";
+  if (!(error instanceof Error)) {
+    return "Не удалось выполнить действие";
+  }
+
+  const labels: Record<string, string> = {
+    "User cannot have more active bookings.":
+      "У вас уже есть максимум активных заявок. Отмените одну из текущих или дождитесь решения администратора.",
+    max_active_bookings:
+      "У вас уже есть максимум активных заявок. Отмените одну из текущих или дождитесь решения администратора.",
+    "Blocked users cannot create bookings.": "Запись сейчас недоступна. Обратитесь к администратору.",
+    user_blocked: "Запись сейчас недоступна. Обратитесь к администратору.",
+  };
+
+  return labels[error.message] ?? error.message;
 }
 
 function previewDates(): string[] {
