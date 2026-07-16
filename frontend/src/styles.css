@@ -421,6 +421,14 @@ button:disabled {
   padding-bottom: 76px;
 }
 
+.date-period-label {
+  margin: 0 2px 12px;
+  color: var(--purple);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
 .date-strip-week {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

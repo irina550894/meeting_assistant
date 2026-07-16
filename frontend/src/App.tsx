@@ -808,6 +808,7 @@ function BookingForm({
     () => datesForView(availableDates, dateView, form.date),
     [availableDates, dateView, form.date],
   );
+  const periodLabel = datePeriodLabel(availableDates, dateView, form.date);
   const canMoveDatesBack = canMoveDateWindow(availableDates, dateView, form.date, -1);
   const canMoveDatesForward = canMoveDateWindow(availableDates, dateView, form.date, 1);
 
@@ -929,29 +930,28 @@ function BookingForm({
                 </button>
               ))}
             </div>
-            {dateView !== "month" ? (
-              <div className="date-window-actions">
-                <button
-                  type="button"
-                  className="icon-button"
-                  disabled={!canMoveDatesBack}
-                  onClick={() => moveDateWindow(-1)}
-                  aria-label="Предыдущий период"
-                >
-                  <ChevronLeft size={18} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="icon-button"
-                  disabled={!canMoveDatesForward}
-                  onClick={() => moveDateWindow(1)}
-                  aria-label="Следующий период"
-                >
-                  <ChevronRight size={18} aria-hidden="true" />
-                </button>
-              </div>
-            ) : null}
+            <div className="date-window-actions">
+              <button
+                type="button"
+                className="icon-button"
+                disabled={!canMoveDatesBack}
+                onClick={() => moveDateWindow(-1)}
+                aria-label="Предыдущий период"
+              >
+                <ChevronLeft size={18} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                disabled={!canMoveDatesForward}
+                onClick={() => moveDateWindow(1)}
+                aria-label="Следующий период"
+              >
+                <ChevronRight size={18} aria-hidden="true" />
+              </button>
+            </div>
           </div>
+          {periodLabel ? <p className="date-period-label">{periodLabel}</p> : null}
           <div className={`date-strip date-strip-${dateView}`}>
             {visibleDates.map((date) => (
               <button
@@ -1736,23 +1736,46 @@ function dateViewLabel(mode: DateViewMode): string {
 }
 
 function datesForView(dates: string[], mode: DateViewMode, selectedDate: string): string[] {
-  if (mode === "month") {
-    return dates;
-  }
-
   if (!dates.length) {
     return [];
   }
 
-  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
-  const anchorIndex = selectedIndex >= 0 ? selectedIndex : 0;
-
-  if (mode === "day") {
-    return [dates[anchorIndex]];
+  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+  if (!anchorDate) {
+    return [];
   }
 
-  const weekStart = Math.floor(anchorIndex / 7) * 7;
-  return dates.slice(weekStart, weekStart + 7);
+  if (mode === "month") {
+    const month = monthKey(anchorDate);
+    return dates.filter((date) => monthKey(date) === month);
+  }
+
+  if (mode === "day") {
+    return dates.includes(anchorDate) ? [anchorDate] : [];
+  }
+
+  const weekStart = startOfIsoWeek(anchorDate);
+  const weekEnd = addDaysIso(weekStart, 6);
+  return dates.filter((date) => date >= weekStart && date <= weekEnd);
+}
+
+function datePeriodLabel(dates: string[], mode: DateViewMode, selectedDate: string): string {
+  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+  if (!anchorDate) {
+    return "";
+  }
+
+  if (mode === "month") {
+    return monthYearLabel(anchorDate);
+  }
+
+  if (mode === "week") {
+    const weekStart = startOfIsoWeek(anchorDate);
+    const weekEnd = addDaysIso(weekStart, 6);
+    return `${isoWeekNumber(anchorDate)} неделя (${dateRangeLabel(weekStart, weekEnd)})`;
+  }
+
+  return fullDateLabel(anchorDate);
 }
 
 function canMoveDateWindow(
@@ -1770,16 +1793,129 @@ function nextDateForView(
   selectedDate: string,
   direction: -1 | 1,
 ): string | null {
-  if (!dates.length || mode === "month") {
+  if (!dates.length) {
     return null;
   }
 
-  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
-  const anchorIndex = selectedIndex >= 0 ? selectedIndex : 0;
-  const offset = mode === "week" ? 7 : 1;
-  const nextIndex = Math.min(Math.max(anchorIndex + offset * direction, 0), dates.length - 1);
+  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+  if (!anchorDate) {
+    return null;
+  }
 
-  return nextIndex === anchorIndex ? null : dates[nextIndex];
+  if (mode === "month") {
+    const currentMonth = monthKey(anchorDate);
+    const candidates = direction > 0
+      ? dates.filter((date) => monthKey(date) > currentMonth)
+      : dates.filter((date) => monthKey(date) < currentMonth);
+    return direction > 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
+  }
+
+  if (mode === "week") {
+    const weekStart = startOfIsoWeek(anchorDate);
+    const weekEnd = addDaysIso(weekStart, 6);
+    const candidates = direction > 0
+      ? dates.filter((date) => date > weekEnd)
+      : dates.filter((date) => date < weekStart);
+    return direction > 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
+  }
+
+  const anchorIndex = dates.indexOf(anchorDate);
+  const nextIndex = anchorIndex + direction;
+
+  return nextIndex < 0 || nextIndex >= dates.length ? null : dates[nextIndex];
+}
+
+function dateViewAnchor(dates: string[], mode: DateViewMode, selectedDate: string): string | null {
+  if (!dates.length) {
+    return null;
+  }
+
+  if (selectedDate && dates.includes(selectedDate)) {
+    return selectedDate;
+  }
+
+  if (mode === "week") {
+    return dates.find((date) => dayOfWeek(date) === 1) ?? dates[0];
+  }
+
+  return dates[0];
+}
+
+function monthKey(value: string): string {
+  return value.slice(0, 7);
+}
+
+function dayOfWeek(value: string): number {
+  return utcDate(value).getUTCDay();
+}
+
+function startOfIsoWeek(value: string): string {
+  const date = utcDate(value);
+  const weekday = date.getUTCDay();
+  const diff = weekday === 0 ? -6 : 1 - weekday;
+  return addDaysIso(value, diff);
+}
+
+function addDaysIso(value: string, days: number): string {
+  const date = utcDate(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isoWeekNumber(value: string): number {
+  const date = utcDate(value);
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - weekday);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+function monthYearLabel(value: string): string {
+  return capitalizeFirst(
+    new Intl.DateTimeFormat("ru-RU", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(utcDate(value)),
+  );
+}
+
+function fullDateLabel(value: string): string {
+  return capitalizeFirst(
+    new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      weekday: "long",
+      timeZone: "UTC",
+    }).format(utcDate(value)),
+  );
+}
+
+function dateRangeLabel(start: string, end: string): string {
+  const startDate = utcDate(start);
+  const endDate = utcDate(end);
+  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", timeZone: "UTC" });
+  const month = new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "UTC" });
+  const startDay = day.format(startDate);
+  const endDay = day.format(endDate);
+  const startMonth = month.format(startDate);
+  const endMonth = month.format(endDate);
+
+  if (startMonth === endMonth) {
+    return `с ${startDay} по ${endDay} ${endMonth}`;
+  }
+
+  return `с ${startDay} ${startMonth} по ${endDay} ${endMonth}`;
+}
+
+function utcDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function capitalizeFirst(value: string): string {
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
 }
 
 function selectedSlot(key: string, slots: MiniAppSlot[]): MiniAppSlot | null {
