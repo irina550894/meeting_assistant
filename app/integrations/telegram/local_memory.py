@@ -167,6 +167,24 @@ class InMemoryRuntimeStore:
         )
         self.restrictions[restriction.id] = restriction
 
+    async def add_time_interval_restriction(
+        self,
+        *,
+        restriction_date: date,
+        start_time: time,
+        end_time: time,
+        admin_comment: str | None,
+    ) -> None:
+        restriction = AdminScheduleRestriction(
+            id=UUID(int=len(self.restrictions) + 1),
+            restriction_date=restriction_date,
+            restriction_type="time_interval",
+            start_time=start_time,
+            end_time=end_time,
+            admin_comment=admin_comment,
+        )
+        self.restrictions[restriction.id] = restriction
+
     async def delete_restriction(self, restriction_id: UUID) -> bool:
         return self.restrictions.pop(restriction_id, None) is not None
 

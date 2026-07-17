@@ -22,7 +22,7 @@ from app.integrations.telegram.status_labels import booking_status_label
 BACK = "Назад"
 CANCEL = "Отмена"
 MENU = "Меню"
-MINI_APP_BUTTON_TEXT = "Открыть Mini App"
+MINI_APP_BUTTON_TEXT = "Открыть"
 
 
 def main_menu_keyboard(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:

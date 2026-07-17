@@ -159,6 +159,19 @@ class FakeAdminSettingsUseCases:
         self.last_restriction_date = restriction_date
         self.last_admin_comment = admin_comment
 
+    async def add_time_interval_restriction(
+        self,
+        *,
+        restriction_date: date,
+        start_time: time,
+        end_time: time,
+        admin_comment: str | None,
+    ):
+        self.last_time_interval_date = restriction_date
+        self.last_time_interval_start = start_time
+        self.last_time_interval_end = end_time
+        self.last_time_interval_comment = admin_comment
+
     async def delete_restriction(self, restriction_id: UUID):
         self.deleted_restriction_id = restriction_id
 
@@ -265,6 +278,15 @@ def test_admin_schedule_settings_restrictions_and_working_hours() -> None:
         "/api/miniapp/admin/schedule/restrictions/closed-day",
         json={"restriction_date": "2026-07-25", "admin_comment": "Vacation"},
     )
+    create_time_response = client.post(
+        "/api/miniapp/admin/schedule/restrictions/time-interval",
+        json={
+            "restriction_date": "2026-07-26",
+            "start_time": "13:00",
+            "end_time": "15:30",
+            "admin_comment": "Busy",
+        },
+    )
     delete_response = client.delete(
         f"/api/miniapp/admin/schedule/restrictions/{settings_use_cases.restriction_id}"
     )
@@ -277,8 +299,29 @@ def test_admin_schedule_settings_restrictions_and_working_hours() -> None:
     assert restrictions_response.json()["items"][0]["restriction_type"] == "closed_day"
     assert create_response.status_code == 200
     assert settings_use_cases.last_restriction_date == date(2026, 7, 25)
+    assert create_time_response.status_code == 200
+    assert settings_use_cases.last_time_interval_date == date(2026, 7, 26)
+    assert settings_use_cases.last_time_interval_start == time(13, 0)
+    assert settings_use_cases.last_time_interval_end == time(15, 30)
+    assert settings_use_cases.last_time_interval_comment == "Busy"
     assert delete_response.status_code == 200
     assert settings_use_cases.deleted_restriction_id == settings_use_cases.restriction_id
+
+
+def test_admin_time_interval_rejects_invalid_range() -> None:
+    client, _, _ = admin_api_client()
+
+    response = client.post(
+        "/api/miniapp/admin/schedule/restrictions/time-interval",
+        json={
+            "restriction_date": "2026-07-26",
+            "start_time": "16:00",
+            "end_time": "15:00",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_time_interval"
 
 
 def test_admin_meeting_types_list_create_and_toggle() -> None:

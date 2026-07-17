@@ -178,6 +178,13 @@ class MiniAppClosedDayRestrictionCreateRequest(BaseModel):
     admin_comment: str | None = None
 
 
+class MiniAppTimeIntervalRestrictionCreateRequest(BaseModel):
+    restriction_date: date
+    start_time: time
+    end_time: time
+    admin_comment: str | None = None
+
+
 class MiniAppAdminMeetingTypeResponse(BaseModel):
     id: UUID
     name: str

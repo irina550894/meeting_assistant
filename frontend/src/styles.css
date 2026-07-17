@@ -369,7 +369,7 @@ button:disabled {
 
 .date-view-switch {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   flex: 1;
   gap: 4px;
   padding: 4px;
@@ -427,14 +427,6 @@ button:disabled {
   font-size: 15px;
   font-weight: 900;
   line-height: 1.35;
-}
-
-.date-strip-week {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.date-strip-day {
-  grid-template-columns: 1fr;
 }
 
 .date-pill {
@@ -834,10 +826,6 @@ button:disabled {
 
   .date-window-actions {
     justify-content: flex-end;
-  }
-
-  .date-strip-week {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .slot-grid,

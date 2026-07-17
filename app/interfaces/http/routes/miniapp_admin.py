@@ -37,6 +37,7 @@ from app.interfaces.http.schemas.miniapp import (
     MiniAppScheduleRestrictionResponse,
     MiniAppScheduleRestrictionsResponse,
     MiniAppScheduleSettingsResponse,
+    MiniAppTimeIntervalRestrictionCreateRequest,
     MiniAppWorkingHoursListResponse,
     MiniAppWorkingHoursResponse,
 )
@@ -223,6 +224,32 @@ async def mini_app_admin_add_closed_day(
         restriction_date=payload.restriction_date,
         admin_comment=payload.admin_comment,
     )
+    return MiniAppOkResponse()
+
+
+@router.post("/schedule/restrictions/time-interval", response_model=MiniAppOkResponse)
+async def mini_app_admin_add_time_interval(
+    payload: MiniAppTimeIntervalRestrictionCreateRequest,
+    admin: Annotated[UserProfile, Depends(get_current_mini_app_admin)],
+    use_cases: Annotated[AdminSettingsUseCases, Depends(get_admin_settings_use_cases)],
+) -> MiniAppOkResponse:
+    del admin
+    if payload.start_time >= payload.end_time:
+        raise _settings_http_error(
+            AdminSettingsUseCaseError(
+                "invalid_time_interval",
+                "Restriction start time must be before end time.",
+            )
+        )
+    try:
+        await use_cases.add_time_interval_restriction(
+            restriction_date=payload.restriction_date,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            admin_comment=payload.admin_comment,
+        )
+    except AdminSettingsUseCaseError as error:
+        raise _settings_http_error(error) from error
     return MiniAppOkResponse()
 
 

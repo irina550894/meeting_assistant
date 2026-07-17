@@ -277,6 +277,26 @@ class SqlAlchemyTelegramRuntimeStore:
                     )
                 )
 
+    async def add_time_interval_restriction(
+        self,
+        *,
+        restriction_date: date,
+        start_time: time,
+        end_time: time,
+        admin_comment: str | None,
+    ) -> None:
+        async with self.session_factory() as session:
+            async with session.begin():
+                session.add(
+                    ScheduleRestrictionModel(
+                        restriction_type=CoreRestrictionType.TIME_INTERVAL.value,
+                        restriction_date=restriction_date,
+                        start_time=start_time,
+                        end_time=end_time,
+                        admin_comment=admin_comment,
+                    )
+                )
+
     async def delete_restriction(self, restriction_id: UUID) -> bool:
         async with self.session_factory() as session:
             async with session.begin():

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, time
 from uuid import UUID
 
 from app.integrations.telegram.ports import (
@@ -43,6 +43,26 @@ class AdminSettingsUseCases:
     ) -> None:
         await self.deps.admin_settings.add_closed_day_restriction(
             restriction_date=restriction_date,
+            admin_comment=admin_comment,
+        )
+
+    async def add_time_interval_restriction(
+        self,
+        *,
+        restriction_date: date,
+        start_time: time,
+        end_time: time,
+        admin_comment: str | None,
+    ) -> None:
+        if start_time >= end_time:
+            raise AdminSettingsUseCaseError(
+                "invalid_time_interval",
+                "Restriction start time must be before end time.",
+            )
+        await self.deps.admin_settings.add_time_interval_restriction(
+            restriction_date=restriction_date,
+            start_time=start_time,
+            end_time=end_time,
             admin_comment=admin_comment,
         )
 

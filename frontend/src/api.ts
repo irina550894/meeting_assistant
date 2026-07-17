@@ -192,6 +192,23 @@ export async function addClosedDayRestriction(
   });
 }
 
+export async function addTimeIntervalRestriction(payload: {
+  restrictionDate: string;
+  startTime: string;
+  endTime: string;
+  adminComment: string | null;
+}): Promise<void> {
+  await request("/api/miniapp/admin/schedule/restrictions/time-interval", {
+    method: "POST",
+    body: JSON.stringify({
+      restriction_date: payload.restrictionDate,
+      start_time: payload.startTime,
+      end_time: payload.endTime,
+      admin_comment: payload.adminComment,
+    }),
+  });
+}
+
 export async function deleteScheduleRestriction(restrictionId: string): Promise<void> {
   await request(`/api/miniapp/admin/schedule/restrictions/${restrictionId}`, {
     method: "DELETE",

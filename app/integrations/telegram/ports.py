@@ -162,6 +162,15 @@ class AdminSettingsStore(Protocol):
         admin_comment: str | None,
     ) -> None: ...
 
+    async def add_time_interval_restriction(
+        self,
+        *,
+        restriction_date: date,
+        start_time: time,
+        end_time: time,
+        admin_comment: str | None,
+    ) -> None: ...
+
     async def delete_restriction(self, restriction_id: UUID) -> bool: ...
 
     async def list_meeting_types_admin(self) -> list[AdminMeetingType]: ...

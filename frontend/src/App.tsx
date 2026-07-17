@@ -22,6 +22,7 @@ import {
   acceptConsent,
   addAdminMeetingType,
   addClosedDayRestriction,
+  addTimeIntervalRestriction,
   cancelBooking,
   confirmAdminBooking,
   createBooking,
@@ -64,7 +65,7 @@ import type {
 
 type TabId = "home" | "bookings" | "calendar" | "admin" | "profile";
 type FormStep = "details" | "slot" | "review";
-type DateViewMode = "month" | "week" | "day";
+type DateViewMode = "month" | "time";
 type ToastTone = "success" | "error" | "info";
 type Toast = { tone: ToastTone; text: string } | null;
 type AdminStatusFilter = "" | "pending" | "confirmed" | "reschedule_requested" | "rejected";
@@ -161,6 +162,10 @@ export function App() {
   const [restrictions, setRestrictions] = useState<MiniAppScheduleRestriction[]>([]);
   const [newClosedDay, setNewClosedDay] = useState("");
   const [newClosedDayComment, setNewClosedDayComment] = useState("");
+  const [newClosedHoursDate, setNewClosedHoursDate] = useState("");
+  const [newClosedHoursStart, setNewClosedHoursStart] = useState("");
+  const [newClosedHoursEnd, setNewClosedHoursEnd] = useState("");
+  const [newClosedHoursComment, setNewClosedHoursComment] = useState("");
   const [adminMeetingTypes, setAdminMeetingTypes] = useState<MiniAppAdminMeetingType[]>([]);
   const [newMeetingTypeName, setNewMeetingTypeName] = useState("");
   const [newMeetingTypeDurations, setNewMeetingTypeDurations] = useState("60");
@@ -520,6 +525,50 @@ export function App() {
     }
   }
 
+  async function handleAddClosedHours() {
+    if (!newClosedHoursDate || !newClosedHoursStart || !newClosedHoursEnd) {
+      showToast("error", "Укажите дату, начало и конец закрытых часов");
+      return;
+    }
+    if (newClosedHoursStart >= newClosedHoursEnd) {
+      showToast("error", "Начало закрытых часов должно быть раньше конца");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      if (isPreview) {
+        setRestrictions((current) => [
+          {
+            id: `preview-restriction-${Date.now()}`,
+            restriction_date: newClosedHoursDate,
+            restriction_type: "time_interval",
+            start_time: newClosedHoursStart,
+            end_time: newClosedHoursEnd,
+            admin_comment: newClosedHoursComment || null,
+          },
+          ...current,
+        ]);
+      } else {
+        await addTimeIntervalRestriction({
+          restrictionDate: newClosedHoursDate,
+          startTime: newClosedHoursStart,
+          endTime: newClosedHoursEnd,
+          adminComment: newClosedHoursComment.trim() || null,
+        });
+        setRestrictions(await loadScheduleRestrictions(new Date().toISOString().slice(0, 10)));
+      }
+      setNewClosedHoursDate("");
+      setNewClosedHoursStart("");
+      setNewClosedHoursEnd("");
+      setNewClosedHoursComment("");
+      showToast("success", "Закрытые часы добавлены");
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleDeleteRestriction(restrictionId: string) {
     setIsBusy(true);
     try {
@@ -671,6 +720,10 @@ export function App() {
                 restrictions={restrictions}
                 newClosedDay={newClosedDay}
                 newClosedDayComment={newClosedDayComment}
+                newClosedHoursDate={newClosedHoursDate}
+                newClosedHoursStart={newClosedHoursStart}
+                newClosedHoursEnd={newClosedHoursEnd}
+                newClosedHoursComment={newClosedHoursComment}
                 meetingTypes={adminMeetingTypes}
                 newMeetingTypeName={newMeetingTypeName}
                 newMeetingTypeDurations={newMeetingTypeDurations}
@@ -685,6 +738,11 @@ export function App() {
                 onNewClosedDayChange={setNewClosedDay}
                 onNewClosedDayCommentChange={setNewClosedDayComment}
                 onAddClosedDay={() => void handleAddClosedDay()}
+                onNewClosedHoursDateChange={setNewClosedHoursDate}
+                onNewClosedHoursStartChange={setNewClosedHoursStart}
+                onNewClosedHoursEndChange={setNewClosedHoursEnd}
+                onNewClosedHoursCommentChange={setNewClosedHoursComment}
+                onAddClosedHours={() => void handleAddClosedHours()}
                 onDeleteRestriction={(id) => void handleDeleteRestriction(id)}
                 onNewMeetingTypeNameChange={setNewMeetingTypeName}
                 onNewMeetingTypeDurationsChange={setNewMeetingTypeDurations}
@@ -802,20 +860,21 @@ function BookingForm({
 }) {
   const selectedMeetingType = meetingTypes.find((item) => item.id === form.meetingTypeId);
   const selected = selectedSlot(form.slotKey, slots);
-  const [dateView, setDateView] = useState<DateViewMode>("week");
+  const [dateView, setDateView] = useState<DateViewMode>("month");
   const activeLimitReached = activeBookingsCount >= MAX_ACTIVE_BOOKINGS && !form.previousBookingId;
   const visibleDates = useMemo(
-    () => datesForView(availableDates, dateView, form.date),
-    [availableDates, dateView, form.date],
+    () => datesForView(availableDates, form.date),
+    [availableDates, form.date],
   );
-  const periodLabel = datePeriodLabel(availableDates, dateView, form.date);
-  const canMoveDatesBack = canMoveDateWindow(availableDates, dateView, form.date, -1);
-  const canMoveDatesForward = canMoveDateWindow(availableDates, dateView, form.date, 1);
+  const periodLabel = datePeriodLabel(availableDates, form.date);
+  const canMoveDatesBack = canMoveDateWindow(availableDates, form.date, -1);
+  const canMoveDatesForward = canMoveDateWindow(availableDates, form.date, 1);
 
   function moveDateWindow(direction: -1 | 1) {
-    const nextDate = nextDateForView(availableDates, dateView, form.date, direction);
+    const nextDate = nextDateForView(availableDates, form.date, direction);
     if (nextDate) {
       onChange({ ...form, date: nextDate, slotKey: "" });
+      setDateView("month");
     }
   }
 
@@ -919,7 +978,7 @@ function BookingForm({
         <>
           <div className="date-toolbar">
             <div className="date-view-switch" aria-label="Режим выбора даты">
-              {(["month", "week", "day"] as DateViewMode[]).map((mode) => (
+              {(["month", "time"] as DateViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -951,65 +1010,78 @@ function BookingForm({
               </button>
             </div>
           </div>
-          {periodLabel ? <p className="date-period-label">{periodLabel}</p> : null}
-          <div className={`date-strip date-strip-${dateView}`}>
-            {visibleDates.map((date) => (
-              <button
-                key={date}
-                type="button"
-                className={form.date === date ? "date-pill date-pill-active" : "date-pill"}
-                onClick={() => onChange({ ...form, date, slotKey: "" })}
-              >
-                <span>{weekdayLabel(date)}</span>
-                <strong>{dayLabel(date)}</strong>
-              </button>
-            ))}
-          </div>
-          {!availableDates.length ? (
-            <p className="panel-copy">Нет доступных дат для выбранного типа встречи.</p>
+          {dateView === "month" ? (
+            <>
+              {periodLabel ? <p className="date-period-label">{periodLabel}</p> : null}
+              <div className="date-strip date-strip-month">
+                {visibleDates.map((date) => (
+                  <button
+                    key={date}
+                    type="button"
+                    className={form.date === date ? "date-pill date-pill-active" : "date-pill"}
+                    onClick={() => {
+                      onChange({ ...form, date, slotKey: "" });
+                      setDateView("time");
+                    }}
+                  >
+                    <span>{weekdayLabel(date)}</span>
+                    <strong>{dayLabel(date)}</strong>
+                  </button>
+                ))}
+              </div>
+              {!availableDates.length ? (
+                <p className="panel-copy">Нет доступных дат для выбранного типа встречи.</p>
+              ) : null}
+            </>
           ) : null}
-          <div className="slot-grid">
-            {slots.map((slot) => {
-              const key = slotKey(slot);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={form.slotKey === key ? "slot-button slot-button-active" : "slot-button"}
-                  onClick={() => onChange({ ...form, slotKey: key })}
-                >
-                  <Clock3 size={16} aria-hidden="true" />
-                  {slot.label}
-                </button>
-              );
-            })}
-          </div>
-          {!slots.length ? <p className="panel-copy">Выберите дату, чтобы увидеть свободные слоты.</p> : null}
+          {dateView === "time" ? (
+            <>
+              {form.date ? <p className="date-period-label">{fullDateLabel(form.date)}</p> : null}
+              <div className="slot-grid">
+                {slots.map((slot) => {
+                  const key = slotKey(slot);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={form.slotKey === key ? "slot-button slot-button-active" : "slot-button"}
+                      onClick={() => onChange({ ...form, slotKey: key })}
+                    >
+                      <Clock3 size={16} aria-hidden="true" />
+                      {slot.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {!form.date ? <p className="panel-copy">Сначала выберите день в месяце.</p> : null}
+              {form.date && !slots.length ? (
+                <p className="panel-copy">На выбранную дату нет свободного времени.</p>
+              ) : null}
+            </>
+          ) : null}
           <button
             type="button"
             className="primary-button"
+            disabled={!form.slotKey || isBusy || activeLimitReached}
             onClick={() => onStepChange("review")}
-            disabled={!selected}
           >
             Проверить заявку
           </button>
+          {activeLimitReached ? (
+            <p className="panel-copy">Сейчас можно иметь не больше {MAX_ACTIVE_BOOKINGS} активных заявок.</p>
+          ) : null}
         </>
       ) : null}
 
       {formStep === "review" ? (
         <div className="review-card">
-          {activeLimitReached ? (
-            <p className="limit-note">
-              У вас уже {MAX_ACTIVE_BOOKINGS} активные заявки. Чтобы создать новую, отмените или дождитесь завершения одной из текущих.
-            </p>
-          ) : null}
           <ReviewRow label="Имя" value={form.fullName} />
           <ReviewRow label="Email" value={form.email} />
           <ReviewRow label="Тип" value={selectedMeetingType?.name ?? "Не выбран"} />
           <ReviewRow label="Время" value={selected ? dateTimeLabel(selected.starts_at) : "Не выбрано"} />
           <ReviewRow label="Комментарий" value={form.comment || "Без комментария"} />
-          <button type="button" className="primary-button" disabled={isBusy || activeLimitReached} onClick={onSubmit}>
-            {isBusy ? "Отправляем..." : "Отправить заявку"}
+          <button type="button" className="primary-button" disabled={isBusy} onClick={onSubmit}>
+            {isBusy ? "Отправляем..." : form.previousBookingId ? "Отправить перенос" : "Отправить заявку"}
           </button>
         </div>
       ) : null}
@@ -1166,6 +1238,10 @@ function AdminScreen({
   restrictions,
   newClosedDay,
   newClosedDayComment,
+  newClosedHoursDate,
+  newClosedHoursStart,
+  newClosedHoursEnd,
+  newClosedHoursComment,
   meetingTypes,
   newMeetingTypeName,
   newMeetingTypeDurations,
@@ -1180,6 +1256,11 @@ function AdminScreen({
   onNewClosedDayChange,
   onNewClosedDayCommentChange,
   onAddClosedDay,
+  onNewClosedHoursDateChange,
+  onNewClosedHoursStartChange,
+  onNewClosedHoursEndChange,
+  onNewClosedHoursCommentChange,
+  onAddClosedHours,
   onDeleteRestriction,
   onNewMeetingTypeNameChange,
   onNewMeetingTypeDurationsChange,
@@ -1199,6 +1280,10 @@ function AdminScreen({
   restrictions: MiniAppScheduleRestriction[];
   newClosedDay: string;
   newClosedDayComment: string;
+  newClosedHoursDate: string;
+  newClosedHoursStart: string;
+  newClosedHoursEnd: string;
+  newClosedHoursComment: string;
   meetingTypes: MiniAppAdminMeetingType[];
   newMeetingTypeName: string;
   newMeetingTypeDurations: string;
@@ -1213,6 +1298,11 @@ function AdminScreen({
   onNewClosedDayChange: (value: string) => void;
   onNewClosedDayCommentChange: (value: string) => void;
   onAddClosedDay: () => void;
+  onNewClosedHoursDateChange: (value: string) => void;
+  onNewClosedHoursStartChange: (value: string) => void;
+  onNewClosedHoursEndChange: (value: string) => void;
+  onNewClosedHoursCommentChange: (value: string) => void;
+  onAddClosedHours: () => void;
   onDeleteRestriction: (id: string) => void;
   onNewMeetingTypeNameChange: (value: string) => void;
   onNewMeetingTypeDurationsChange: (value: string) => void;
@@ -1259,10 +1349,19 @@ function AdminScreen({
           restrictions={restrictions}
           newClosedDay={newClosedDay}
           newClosedDayComment={newClosedDayComment}
+          newClosedHoursDate={newClosedHoursDate}
+          newClosedHoursStart={newClosedHoursStart}
+          newClosedHoursEnd={newClosedHoursEnd}
+          newClosedHoursComment={newClosedHoursComment}
           isBusy={isBusy}
           onNewClosedDayChange={onNewClosedDayChange}
           onNewClosedDayCommentChange={onNewClosedDayCommentChange}
           onAddClosedDay={onAddClosedDay}
+          onNewClosedHoursDateChange={onNewClosedHoursDateChange}
+          onNewClosedHoursStartChange={onNewClosedHoursStartChange}
+          onNewClosedHoursEndChange={onNewClosedHoursEndChange}
+          onNewClosedHoursCommentChange={onNewClosedHoursCommentChange}
+          onAddClosedHours={onAddClosedHours}
           onDeleteRestriction={onDeleteRestriction}
         />
       ) : null}
@@ -1460,10 +1559,19 @@ function AdminScheduleView({
   restrictions,
   newClosedDay,
   newClosedDayComment,
+  newClosedHoursDate,
+  newClosedHoursStart,
+  newClosedHoursEnd,
+  newClosedHoursComment,
   isBusy,
   onNewClosedDayChange,
   onNewClosedDayCommentChange,
   onAddClosedDay,
+  onNewClosedHoursDateChange,
+  onNewClosedHoursStartChange,
+  onNewClosedHoursEndChange,
+  onNewClosedHoursCommentChange,
+  onAddClosedHours,
   onDeleteRestriction,
 }: {
   settings: MiniAppScheduleSettings | null;
@@ -1471,10 +1579,19 @@ function AdminScheduleView({
   restrictions: MiniAppScheduleRestriction[];
   newClosedDay: string;
   newClosedDayComment: string;
+  newClosedHoursDate: string;
+  newClosedHoursStart: string;
+  newClosedHoursEnd: string;
+  newClosedHoursComment: string;
   isBusy: boolean;
   onNewClosedDayChange: (value: string) => void;
   onNewClosedDayCommentChange: (value: string) => void;
   onAddClosedDay: () => void;
+  onNewClosedHoursDateChange: (value: string) => void;
+  onNewClosedHoursStartChange: (value: string) => void;
+  onNewClosedHoursEndChange: (value: string) => void;
+  onNewClosedHoursCommentChange: (value: string) => void;
+  onAddClosedHours: () => void;
   onDeleteRestriction: (id: string) => void;
 }) {
   return (
@@ -1524,12 +1641,57 @@ function AdminScheduleView({
           </button>
         </div>
       </div>
+      <div className="detail-panel">
+        <PanelHeader title="Закрытые часы" action="Добавить" />
+        <div className="form-grid">
+          <label>
+            <span>Дата</span>
+            <input
+              type="date"
+              value={newClosedHoursDate}
+              onChange={(event) => onNewClosedHoursDateChange(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Начало</span>
+            <input
+              type="time"
+              value={newClosedHoursStart}
+              onChange={(event) => onNewClosedHoursStartChange(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Конец</span>
+            <input
+              type="time"
+              value={newClosedHoursEnd}
+              onChange={(event) => onNewClosedHoursEndChange(event.target.value)}
+            />
+          </label>
+          <label className="wide-field">
+            <span>Комментарий</span>
+            <textarea
+              value={newClosedHoursComment}
+              onChange={(event) => onNewClosedHoursCommentChange(event.target.value)}
+              placeholder="Например: занято, личная встреча"
+            />
+          </label>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={isBusy}
+            onClick={onAddClosedHours}
+          >
+            Добавить закрытые часы
+          </button>
+        </div>
+      </div>
       <div className="timeline-list">
         {restrictions.map((restriction) => (
           <div key={restriction.id} className="booking-row">
             <div>
               <strong>{dateLabel(restriction.restriction_date)}</strong>
-              <span>{restriction.admin_comment || restriction.restriction_type}</span>
+              <span>{restrictionLabel(restriction)}</span>
             </div>
             <button
               type="button"
@@ -1729,67 +1891,44 @@ function ToastMessage({ toast }: { toast: NonNullable<Toast> }) {
 function dateViewLabel(mode: DateViewMode): string {
   const labels: Record<DateViewMode, string> = {
     month: "Месяц",
-    week: "Неделя",
-    day: "День",
+    time: "Время",
   };
   return labels[mode];
 }
 
-function datesForView(dates: string[], mode: DateViewMode, selectedDate: string): string[] {
+function datesForView(dates: string[], selectedDate: string): string[] {
   if (!dates.length) {
     return [];
   }
 
-  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+  const anchorDate = dateViewAnchor(dates, selectedDate);
   if (!anchorDate) {
     return [];
   }
 
-  if (mode === "month") {
-    const month = monthKey(anchorDate);
-    return dates.filter((date) => monthKey(date) === month);
-  }
-
-  if (mode === "day") {
-    return dates.includes(anchorDate) ? [anchorDate] : [];
-  }
-
-  const weekStart = startOfIsoWeek(anchorDate);
-  const weekEnd = addDaysIso(weekStart, 6);
-  return dates.filter((date) => date >= weekStart && date <= weekEnd);
+  const month = monthKey(anchorDate);
+  return dates.filter((date) => monthKey(date) === month);
 }
 
-function datePeriodLabel(dates: string[], mode: DateViewMode, selectedDate: string): string {
-  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+function datePeriodLabel(dates: string[], selectedDate: string): string {
+  const anchorDate = dateViewAnchor(dates, selectedDate);
   if (!anchorDate) {
     return "";
   }
 
-  if (mode === "month") {
-    return monthYearLabel(anchorDate);
-  }
-
-  if (mode === "week") {
-    const weekStart = startOfIsoWeek(anchorDate);
-    const weekEnd = addDaysIso(weekStart, 6);
-    return `${isoWeekNumber(anchorDate)} неделя (${dateRangeLabel(weekStart, weekEnd)})`;
-  }
-
-  return fullDateLabel(anchorDate);
+  return monthYearLabel(anchorDate);
 }
 
 function canMoveDateWindow(
   dates: string[],
-  mode: DateViewMode,
   selectedDate: string,
   direction: -1 | 1,
 ): boolean {
-  return Boolean(nextDateForView(dates, mode, selectedDate, direction));
+  return Boolean(nextDateForView(dates, selectedDate, direction));
 }
 
 function nextDateForView(
   dates: string[],
-  mode: DateViewMode,
   selectedDate: string,
   direction: -1 | 1,
 ): string | null {
@@ -1797,35 +1936,19 @@ function nextDateForView(
     return null;
   }
 
-  const anchorDate = dateViewAnchor(dates, mode, selectedDate);
+  const anchorDate = dateViewAnchor(dates, selectedDate);
   if (!anchorDate) {
     return null;
   }
 
-  if (mode === "month") {
-    const currentMonth = monthKey(anchorDate);
-    const candidates = direction > 0
-      ? dates.filter((date) => monthKey(date) > currentMonth)
-      : dates.filter((date) => monthKey(date) < currentMonth);
-    return direction > 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
-  }
-
-  if (mode === "week") {
-    const weekStart = startOfIsoWeek(anchorDate);
-    const weekEnd = addDaysIso(weekStart, 6);
-    const candidates = direction > 0
-      ? dates.filter((date) => date > weekEnd)
-      : dates.filter((date) => date < weekStart);
-    return direction > 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
-  }
-
-  const anchorIndex = dates.indexOf(anchorDate);
-  const nextIndex = anchorIndex + direction;
-
-  return nextIndex < 0 || nextIndex >= dates.length ? null : dates[nextIndex];
+  const currentMonth = monthKey(anchorDate);
+  const candidates = direction > 0
+    ? dates.filter((date) => monthKey(date) > currentMonth)
+    : dates.filter((date) => monthKey(date) < currentMonth);
+  return direction > 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
 }
 
-function dateViewAnchor(dates: string[], mode: DateViewMode, selectedDate: string): string | null {
+function dateViewAnchor(dates: string[], selectedDate: string): string | null {
   if (!dates.length) {
     return null;
   }
@@ -1834,40 +1957,11 @@ function dateViewAnchor(dates: string[], mode: DateViewMode, selectedDate: strin
     return selectedDate;
   }
 
-  if (mode === "week") {
-    return dates.find((date) => dayOfWeek(date) === 1) ?? dates[0];
-  }
-
   return dates[0];
 }
 
 function monthKey(value: string): string {
   return value.slice(0, 7);
-}
-
-function dayOfWeek(value: string): number {
-  return utcDate(value).getUTCDay();
-}
-
-function startOfIsoWeek(value: string): string {
-  const date = utcDate(value);
-  const weekday = date.getUTCDay();
-  const diff = weekday === 0 ? -6 : 1 - weekday;
-  return addDaysIso(value, diff);
-}
-
-function addDaysIso(value: string, days: number): string {
-  const date = utcDate(value);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function isoWeekNumber(value: string): number {
-  const date = utcDate(value);
-  const weekday = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - weekday);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
 function monthYearLabel(value: string): string {
@@ -1890,23 +1984,6 @@ function fullDateLabel(value: string): string {
       timeZone: "UTC",
     }).format(utcDate(value)),
   );
-}
-
-function dateRangeLabel(start: string, end: string): string {
-  const startDate = utcDate(start);
-  const endDate = utcDate(end);
-  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", timeZone: "UTC" });
-  const month = new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "UTC" });
-  const startDay = day.format(startDate);
-  const endDay = day.format(endDate);
-  const startMonth = month.format(startDate);
-  const endMonth = month.format(endDate);
-
-  if (startMonth === endMonth) {
-    return `с ${startDay} по ${endDay} ${endMonth}`;
-  }
-
-  return `с ${startDay} ${startMonth} по ${endDay} ${endMonth}`;
 }
 
 function utcDate(value: string): Date {
@@ -1990,6 +2067,14 @@ function dateLabel(value: string): string {
     day: "2-digit",
     month: "short",
   }).format(new Date(value));
+}
+
+function restrictionLabel(restriction: MiniAppScheduleRestriction): string {
+  const comment = restriction.admin_comment ? ` · ${restriction.admin_comment}` : "";
+  if (restriction.restriction_type === "time_interval" && restriction.start_time && restriction.end_time) {
+    return `${restriction.start_time.slice(0, 5)} - ${restriction.end_time.slice(0, 5)}${comment}`;
+  }
+  return `Весь день${comment}`;
 }
 
 function dateTimeLabel(value: string): string {
