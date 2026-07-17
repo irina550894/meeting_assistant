@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     meeting_buffer_minutes: int = 90
     pending_booking_ttl_hours: int = 48
     cancellation_deadline_hours: int = 2
-    max_active_bookings_per_user: int = 2
+    max_active_bookings_per_user: int = 10
 
     personal_data_consent_url: str | None = None
     personal_data_policy_url: str | None = None

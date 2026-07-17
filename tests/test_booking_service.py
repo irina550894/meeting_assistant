@@ -86,10 +86,9 @@ def test_cannot_create_booking_for_blocked_user() -> None:
     assert error.value.rule == "user_blocked"
 
 
-def test_cannot_create_third_active_booking() -> None:
+def test_cannot_create_eleventh_active_booking() -> None:
     user = consented_user()
-    active_1 = create_pending_booking(user=user)
-    active_2 = create_pending_booking(user=user)
+    active_bookings = [create_pending_booking(user=user) for _ in range(10)]
 
     with pytest.raises(BusinessRuleError) as error:
         service().create_booking(
@@ -99,7 +98,7 @@ def test_cannot_create_third_active_booking() -> None:
             starts_at=NOW + timedelta(days=3),
             ends_at=NOW + timedelta(days=3, hours=1),
             now=NOW,
-            existing_bookings=[active_1, active_2],
+            existing_bookings=active_bookings,
             final_confirmation=True,
         )
 

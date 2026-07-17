@@ -35,7 +35,7 @@ class BookingService:
     def __init__(
         self,
         *,
-        max_active_bookings_per_user: int = 2,
+        max_active_bookings_per_user: int = 10,
         pending_booking_ttl: timedelta = timedelta(hours=48),
         cancellation_deadline: timedelta = timedelta(hours=2),
     ) -> None:

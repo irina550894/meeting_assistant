@@ -96,7 +96,7 @@ const tabs: Tab[] = [
   { id: "profile", label: "Профиль", icon: UserRound },
 ];
 
-const MAX_ACTIVE_BOOKINGS = 2;
+const MAX_ACTIVE_BOOKINGS = 10;
 
 const previewUser: MiniAppUser = {
   id: "preview",
