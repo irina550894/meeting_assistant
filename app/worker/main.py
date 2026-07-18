@@ -14,7 +14,10 @@ from app.integrations.telegram.critical_notifications import notify_critical_adm
 from app.integrations.telegram.worker_notifications import TelegramReminderSender
 from app.logging.config import configure_logging, get_logger
 from app.persistence.database import AsyncSessionFactory
-from app.persistence.repositories import SqlAlchemyBackgroundJobRepository
+from app.persistence.repositories import (
+    SqlAlchemyBackgroundJobRepository,
+    SqlAlchemyGoogleOAuthTokenStore,
+)
 from app.settings.config import Settings, get_settings
 from app.worker.jobs import GoogleEventChecker, ReminderSender, WorkerRunResult, WorkerService
 from app.worker.scheduler import BackgroundJobScheduler
@@ -36,7 +39,7 @@ async def run_worker_once_async(service: WorkerService | None = None) -> WorkerR
                 repository=repository,
                 settings=settings,
                 reminder_sender=_reminder_sender(bot),
-                google_event_checker=_google_event_checker(settings),
+                google_event_checker=await _google_event_checker(settings),
                 now=lambda: datetime.now(UTC),
             )
             result = await worker.run_once()
@@ -100,7 +103,15 @@ def _reminder_sender(bot: Bot | None) -> ReminderSender | None:
     return TelegramReminderSender(bot)
 
 
-def _google_event_checker(settings: Settings) -> GoogleEventChecker | None:
+async def _google_event_checker(settings: Settings) -> GoogleEventChecker | None:
+    stored_tokens = await SqlAlchemyGoogleOAuthTokenStore(
+        session_factory=AsyncSessionFactory,
+        settings=settings,
+    ).get()
+    if stored_tokens is not None:
+        client = GoogleCalendarClient(settings=settings, token_provider=lambda: stored_tokens)
+        return GoogleCalendarEventChecker(client)
+
     if not (
         settings.google_oauth_client_id
         and settings.google_oauth_client_secret

@@ -32,6 +32,7 @@ from app.integrations.telegram.runtime import _google_calendar_runtime
 from app.persistence.database import AsyncSessionFactory
 from app.persistence.repositories import (
     CommittedBackgroundJobScheduler,
+    SqlAlchemyGoogleOAuthTokenStore,
     SqlAlchemyMiniAppEventStore,
     SqlAlchemyTelegramRuntimeStore,
 )
@@ -89,7 +90,7 @@ async def get_current_mini_app_admin(
     return user
 
 
-def get_user_booking_use_cases(request: Request) -> UserBookingUseCases:
+async def get_user_booking_use_cases(request: Request) -> UserBookingUseCases:
     settings = get_settings()
     store = SqlAlchemyTelegramRuntimeStore(session_factory=AsyncSessionFactory, settings=settings)
     booking_service = BookingService(
@@ -97,7 +98,7 @@ def get_user_booking_use_cases(request: Request) -> UserBookingUseCases:
         pending_booking_ttl=timedelta(hours=settings.pending_booking_ttl_hours),
         cancellation_deadline=timedelta(hours=settings.cancellation_deadline_hours),
     )
-    google_calendar = _google_calendar_runtime(settings)
+    google_calendar = await _google_calendar_runtime_for_http(settings)
     schedule_provider = (
         GoogleCalendarScheduleProvider(base=store, client=google_calendar)
         if google_calendar
@@ -132,7 +133,7 @@ def get_user_booking_use_cases(request: Request) -> UserBookingUseCases:
     )
 
 
-def get_admin_booking_use_cases(request: Request) -> AdminBookingUseCases:
+async def get_admin_booking_use_cases(request: Request) -> AdminBookingUseCases:
     settings = get_settings()
     store = SqlAlchemyTelegramRuntimeStore(session_factory=AsyncSessionFactory, settings=settings)
     booking_service = BookingService(
@@ -140,7 +141,7 @@ def get_admin_booking_use_cases(request: Request) -> AdminBookingUseCases:
         pending_booking_ttl=timedelta(hours=settings.pending_booking_ttl_hours),
         cancellation_deadline=timedelta(hours=settings.cancellation_deadline_hours),
     )
-    google_calendar = _google_calendar_runtime(settings)
+    google_calendar = await _google_calendar_runtime_for_http(settings)
     confirmation_gateway = (
         GoogleCalendarConfirmationGateway(google_calendar)
         if google_calendar
@@ -182,3 +183,15 @@ def get_mini_app_analytics_service() -> MiniAppAnalyticsService:
             clock=_clock,
         )
     )
+
+
+async def _google_calendar_runtime_for_http(settings):
+    tokens = await SqlAlchemyGoogleOAuthTokenStore(
+        session_factory=AsyncSessionFactory,
+        settings=settings,
+    ).get()
+    if tokens is not None:
+        from app.integrations.google_calendar import GoogleCalendarClient
+
+        return GoogleCalendarClient(settings=settings, token_provider=lambda: tokens)
+    return _google_calendar_runtime(settings)

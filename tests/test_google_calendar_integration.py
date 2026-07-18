@@ -1,6 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from google.auth.exceptions import RefreshError
 import pytest
 from pydantic import SecretStr
 
@@ -13,17 +14,23 @@ from app.core.booking import (
 )
 from app.core.scheduling import BusySource
 from app.integrations.google_calendar import GoogleCalendarClient, GoogleCalendarConfirmationGateway
+from app.integrations.google_calendar.oauth import GoogleOAuthService
+from app.integrations.google_calendar.token_store import InMemoryGoogleOAuthTokenStore
 from app.integrations.google_calendar.entities import GoogleOAuthTokens
+from app.integrations.google_calendar.errors import GoogleCalendarAccessLostError
 from app.settings.config import Settings
 
 MOSCOW = ZoneInfo("Europe/Moscow")
 
 
 class FakeRequest:
-    def __init__(self, response: dict | None = None) -> None:
+    def __init__(self, response: dict | None = None, error: Exception | None = None) -> None:
         self.response = response or {}
+        self.error = error
 
     def execute(self) -> dict:
+        if self.error:
+            raise self.error
         return self.response
 
 
@@ -33,7 +40,7 @@ class FakeFreebusyResource:
 
     def query(self, *, body: dict) -> FakeRequest:
         self.service.freebusy_body = body
-        return FakeRequest(self.service.freebusy_response)
+        return FakeRequest(self.service.freebusy_response, self.service.freebusy_error)
 
 
 class FakeEventsResource:
@@ -71,6 +78,7 @@ class FakeCalendarService:
                 }
             }
         }
+        self.freebusy_error: Exception | None = None
         self.freebusy_body: dict | None = None
         self.insert_args: dict | None = None
         self.delete_args: dict | None = None
@@ -95,6 +103,36 @@ def test_google_calendar_freebusy_maps_to_busy_intervals() -> None:
     assert intervals[0].source == BusySource.CALENDAR
     assert intervals[0].starts_at == datetime(2026, 7, 10, 12, 0, tzinfo=MOSCOW)
     assert service.freebusy_body["items"] == [{"id": "primary"}]
+
+
+def test_google_calendar_refresh_error_maps_to_access_lost() -> None:
+    service = FakeCalendarService()
+    service.freebusy_error = RefreshError("invalid_grant")
+    client = _client(service)
+
+    with pytest.raises(GoogleCalendarAccessLostError):
+        client.list_busy_intervals(
+            time_min=datetime(2026, 7, 10, 10, 0, tzinfo=MOSCOW),
+            time_max=datetime(2026, 7, 10, 18, 0, tzinfo=MOSCOW),
+        )
+
+
+def test_google_oauth_authorization_url_does_not_require_lost_pkce_verifier() -> None:
+    service = GoogleOAuthService(
+        settings=Settings(
+            google_oauth_client_id="client-id",
+            google_oauth_client_secret=SecretStr("client-secret"),
+            google_oauth_redirect_uri="https://calendar.example.com/oauth/google/callback",
+        ),
+        token_store=InMemoryGoogleOAuthTokenStore(),
+    )
+
+    url, state = service.authorization_url(admin_telegram_id=1001)
+
+    assert state
+    assert "code_challenge=" not in url
+    assert "access_type=offline" in url
+    assert "prompt=consent" in url
 
 
 def test_google_calendar_create_event_contains_mvp_fields() -> None:

@@ -2111,6 +2111,21 @@ function errorText(error: unknown): string {
       "У вас уже есть максимум активных заявок. Отмените одну из текущих или дождитесь решения администратора.",
     "Blocked users cannot create bookings.": "Запись сейчас недоступна. Обратитесь к администратору.",
     user_blocked: "Запись сейчас недоступна. Обратитесь к администратору.",
+    "Google Calendar is not connected.":
+      "Google Calendar не подключен. Проверьте настройки календаря на сервере.",
+    google_calendar_not_connected:
+      "Google Calendar не подключен. Проверьте настройки календаря на сервере.",
+    "Google Calendar access is lost.":
+      "Доступ к Google Calendar потерян. Нужно заново подключить календарь.",
+    google_calendar_access_lost:
+      "Доступ к Google Calendar потерян. Нужно заново подключить календарь.",
+    "Google Calendar failed: freebusy.":
+      "Не удалось проверить занятость Google Calendar. Проверьте подключение календаря и попробуйте снова.",
+    google_calendar_api_error:
+      "Не удалось выполнить запрос к Google Calendar. Проверьте календарь и попробуйте снова.",
+    "Selected slot is busy in Google Calendar.":
+      "Этот слот уже занят в Google Calendar. Выберите другое время.",
+    calendar_conflict: "Этот слот уже занят в Google Calendar. Выберите другое время.",
   };
 
   return labels[error.message] ?? error.message;

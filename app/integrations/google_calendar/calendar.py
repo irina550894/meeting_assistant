@@ -2,6 +2,7 @@ from collections.abc import Callable
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -48,10 +49,16 @@ class GoogleCalendarClient:
             response = service.freebusy().query(body=body).execute()
         except HttpError as error:
             self._raise_for_http_error(error, operation="freebusy")
+        except RefreshError as error:
+            self._raise_for_refresh_error(error, operation="freebusy")
         except Exception as error:
             logger.error(
                 "Google Calendar API error",
-                extra={"event": "google_api_error", "operation": "freebusy"},
+                extra={
+                    "event": "google_api_error",
+                    "operation": "freebusy",
+                    "error_type": type(error).__name__,
+                },
             )
             raise GoogleCalendarApiError("freebusy") from error
         calendar_data = response.get("calendars", {}).get(self.settings.google_calendar_id, {})
@@ -89,6 +96,8 @@ class GoogleCalendarClient:
             )
         except HttpError as error:
             self._raise_for_http_error(error, operation="create_event")
+        except RefreshError as error:
+            self._raise_for_refresh_error(error, operation="create_event")
         except Exception as error:
             logger.error(
                 "Google Calendar API error",
@@ -96,6 +105,7 @@ class GoogleCalendarClient:
                     "event": "google_api_error",
                     "operation": "create_event",
                     "booking_id": str(booking.id),
+                    "error_type": type(error).__name__,
                 },
             )
             raise GoogleCalendarApiError("create_event") from error
@@ -128,10 +138,16 @@ class GoogleCalendarClient:
                 )
                 raise GoogleCalendarEventMissingError() from error
             self._raise_for_http_error(error, operation="cancel_event")
+        except RefreshError as error:
+            self._raise_for_refresh_error(error, operation="cancel_event")
         except Exception as error:
             logger.error(
                 "Google Calendar API error",
-                extra={"event": "google_api_error", "operation": "cancel_event"},
+                extra={
+                    "event": "google_api_error",
+                    "operation": "cancel_event",
+                    "error_type": type(error).__name__,
+                },
             )
             raise GoogleCalendarApiError("cancel_event") from error
         logger.info("Google Calendar event cancelled", extra={"event": "google_event_cancelled"})
@@ -151,10 +167,16 @@ class GoogleCalendarClient:
                 )
                 raise GoogleCalendarEventMissingError() from error
             self._raise_for_http_error(error, operation="get_event")
+        except RefreshError as error:
+            self._raise_for_refresh_error(error, operation="get_event")
         except Exception as error:
             logger.error(
                 "Google Calendar API error",
-                extra={"event": "google_api_error", "operation": "get_event"},
+                extra={
+                    "event": "google_api_error",
+                    "operation": "get_event",
+                    "error_type": type(error).__name__,
+                },
             )
             raise GoogleCalendarApiError("get_event") from error
 
@@ -219,14 +241,34 @@ class GoogleCalendarClient:
         if status in {401, 403}:
             logger.error(
                 "Google Calendar access lost",
-                extra={"event": "google_access_lost", "operation": operation},
+                extra={
+                    "event": "google_access_lost",
+                    "operation": operation,
+                    "http_status": status,
+                },
             )
             raise GoogleCalendarAccessLostError() from error
         logger.error(
             "Google Calendar API error",
-            extra={"event": "google_api_error", "operation": operation},
+            extra={
+                "event": "google_api_error",
+                "operation": operation,
+                "http_status": status,
+            },
         )
         raise GoogleCalendarApiError(operation) from error
+
+    @staticmethod
+    def _raise_for_refresh_error(error: RefreshError, *, operation: str) -> None:
+        logger.error(
+            "Google Calendar access lost",
+            extra={
+                "event": "google_access_lost",
+                "operation": operation,
+                "error_type": type(error).__name__,
+            },
+        )
+        raise GoogleCalendarAccessLostError() from error
 
 
 def _parse_google_datetime(value: str, timezone: str) -> datetime:

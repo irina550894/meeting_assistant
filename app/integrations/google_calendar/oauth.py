@@ -85,6 +85,7 @@ class GoogleOAuthService:
             self._client_config(),
             scopes=list(CALENDAR_SCOPES),
             redirect_uri=redirect_uri,
+            autogenerate_code_verifier=False,
         )
 
     def _client_config(self) -> dict[str, dict[str, object]]:
