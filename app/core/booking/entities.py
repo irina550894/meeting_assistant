@@ -76,6 +76,7 @@ class BookingRecord:
     status: BookingStatus
     created_source: str = "telegram_bot"
     id: uuid.UUID = field(default_factory=uuid.uuid4)
+    display_number: int | None = None
     user_comment: str | None = None
     rejection_reason: str | None = None
     cancellation_reason: str | None = None

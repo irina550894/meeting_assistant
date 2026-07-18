@@ -82,6 +82,7 @@ class MiniAppBookingCreateRequest(BaseModel):
 
 class MiniAppBookingResponse(BaseModel):
     id: UUID
+    display_number: int | None
     status: str
     meeting_type_id: UUID
     duration_minutes: int

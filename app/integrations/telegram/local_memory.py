@@ -38,6 +38,7 @@ class InMemoryRuntimeStore:
         self.audit_entries: list[AuditEntry] = []
         self.meeting_types: dict[UUID, MeetingType] = {}
         self.restrictions: dict[UUID, AdminScheduleRestriction] = {}
+        self.next_booking_display_number = 1
         self._seed_meeting_types()
 
     async def get_by_telegram_id(self, telegram_id: int) -> UserProfile | None:
@@ -87,14 +88,26 @@ class InMemoryRuntimeStore:
         return None
 
     async def save_booking_result(self, result: BookingCreationResult) -> None:
+        self._ensure_booking_display_number(result.booking)
         self.bookings[result.booking.id] = result.booking
         self.audit_entries.extend(result.audit_entries)
 
     async def save_booking(self, booking: BookingRecord) -> None:
+        self._ensure_booking_display_number(booking)
         self.bookings[booking.id] = booking
 
     async def save_audit_entries(self, entries: list[AuditEntry]) -> None:
         self.audit_entries.extend(entries)
+
+    def _ensure_booking_display_number(self, booking: BookingRecord) -> None:
+        if booking.display_number is not None:
+            self.next_booking_display_number = max(
+                self.next_booking_display_number,
+                booking.display_number + 1,
+            )
+            return
+        booking.display_number = self.next_booking_display_number
+        self.next_booking_display_number += 1
 
     async def context_for_date(self, target_date: date) -> FlowScheduleContext:
         return FlowScheduleContext(

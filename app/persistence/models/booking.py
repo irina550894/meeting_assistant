@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,13 @@ class Booking(UuidPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("starts_at < ends_at", name="valid_time_range"),
     )
 
+    display_number: Mapped[int] = mapped_column(
+        Integer,
+        unique=True,
+        index=True,
+        nullable=False,
+        server_default=text("nextval('booking_display_number_seq'::regclass)"),
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),

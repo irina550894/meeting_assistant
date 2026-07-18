@@ -40,7 +40,7 @@ class TelegramUserFlowNotifier:
         await _send_telegram_message(
             self.bot,
             chat_id=self.settings.telegram_admin_id,
-            text=f"Пользователь отменил заявку {booking.id}.",
+            text=f"Пользователь отменил заявку {_booking_number_label(booking)}.",
         )
 
     async def reschedule_requested(self, booking: BookingRecord) -> None:
@@ -49,7 +49,7 @@ class TelegramUserFlowNotifier:
         await _send_telegram_message(
             self.bot,
             chat_id=self.settings.telegram_admin_id,
-            text=f"Поступила заявка на перенос {booking.id}.",
+            text=f"Поступила заявка на перенос {_booking_number_label(booking)}.",
             reply_markup=admin_booking_actions_keyboard(booking),
         )
 
@@ -137,3 +137,9 @@ def _confirmed_booking_text(
             "Приглашение отправлено на email через Google Calendar.",
         ]
     )
+
+
+def _booking_number_label(booking: BookingRecord) -> str:
+    if booking.display_number is not None:
+        return f"№{booking.display_number}"
+    return str(booking.id)

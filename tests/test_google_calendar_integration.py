@@ -161,6 +161,7 @@ def test_google_calendar_create_event_contains_mvp_fields() -> None:
     assert body["location"] == "https://telemost.example/meeting"
     assert {"email": "client@example.com"} in body["attendees"]
     assert {"email": "admin@example.com"} in body["attendees"]
+    assert "Заявка: №42" in body["description"]
     assert "Имя: Ирина" in body["description"]
     assert "Telegram: @client_user" in body["description"]
     assert "Email: client@example.com" in body["description"]
@@ -219,5 +220,6 @@ def _booking() -> BookingRecord:
         starts_at=datetime(2026, 7, 10, 12, 0, tzinfo=MOSCOW),
         ends_at=datetime(2026, 7, 10, 12, 30, tzinfo=MOSCOW),
         status=BookingStatus.PENDING,
+        display_number=42,
         user_comment="Обсудить проект",
     )

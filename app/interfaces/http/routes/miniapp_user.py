@@ -234,6 +234,7 @@ def _user_response(user: UserProfile) -> MiniAppUserResponse:
 def _booking_response(booking: BookingRecord) -> MiniAppBookingResponse:
     return MiniAppBookingResponse(
         id=booking.id,
+        display_number=booking.display_number,
         status=booking.status.value,
         meeting_type_id=booking.meeting_type_id,
         duration_minutes=booking.duration_minutes,

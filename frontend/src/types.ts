@@ -76,6 +76,7 @@ export type MiniAppSlot = {
 
 export type MiniAppBooking = {
   id: string;
+  display_number: number | null;
   status: string;
   meeting_type_id: string;
   duration_minutes: number;

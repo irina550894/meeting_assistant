@@ -25,6 +25,7 @@ def test_booking_table_has_status_and_reservation_fields() -> None:
     booking = Base.metadata.tables["bookings"]
 
     assert "status" in booking.columns
+    assert "display_number" in booking.columns
     assert "created_source" in booking.columns
     assert "reserved_until" in booking.columns
     assert "google_calendar_event_id" in booking.columns

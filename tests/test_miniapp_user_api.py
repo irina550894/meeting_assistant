@@ -19,6 +19,7 @@ class FakeUserUseCases:
         )
         self.booking = BookingRecord(
             id=uuid4(),
+            display_number=7,
             user_id=USER.id,
             meeting_type_id=self.meeting_type.id,
             duration_minutes=60,
@@ -133,8 +134,10 @@ def test_create_list_and_cancel_booking() -> None:
 
     assert create_response.status_code == 200
     assert create_response.json()["booking"]["id"] == str(use_cases.booking.id)
+    assert create_response.json()["booking"]["display_number"] == 7
     assert list_response.status_code == 200
     assert list_response.json()["items"][0]["id"] == str(use_cases.booking.id)
+    assert list_response.json()["items"][0]["display_number"] == 7
     assert cancel_response.status_code == 200
     assert cancel_response.json()["booking"]["status"] == "cancelled_by_user"
     assert cancel_response.json()["booking"]["cancellation_reason"] == "Cannot attend"

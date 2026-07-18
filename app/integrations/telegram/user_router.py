@@ -759,6 +759,12 @@ def _booking_text(booking: BookingRecord) -> str:
 
 def _booking_summary(booking: BookingRecord) -> str:
     return (
-        f"{format_datetime_msk(booking.starts_at)}, "
+        f"{_booking_number_label(booking)}: {format_datetime_msk(booking.starts_at)}, "
         f"{booking.duration_minutes} минут, {booking_status_label(booking.status)}"
     )
+
+
+def _booking_number_label(booking: BookingRecord) -> str:
+    if booking.display_number is not None:
+        return f"№{booking.display_number}"
+    return str(booking.id)

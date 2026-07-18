@@ -36,6 +36,8 @@ def timestamp_columns() -> tuple[sa.Column, sa.Column]:
 
 
 def upgrade() -> None:
+    op.execute("CREATE SEQUENCE IF NOT EXISTS booking_display_number_seq")
+
     op.create_table(
         "users",
         sa.Column("telegram_id", sa.BigInteger(), nullable=False),
@@ -128,6 +130,12 @@ def upgrade() -> None:
 
     op.create_table(
         "bookings",
+        sa.Column(
+            "display_number",
+            sa.Integer(),
+            server_default=sa.text("nextval('booking_display_number_seq'::regclass)"),
+            nullable=False,
+        ),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("meeting_type_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("duration_minutes", sa.Integer(), nullable=False),
@@ -151,6 +159,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_bookings_display_number", "bookings", ["display_number"], unique=True)
     op.create_index("ix_bookings_reserved_until", "bookings", ["reserved_until"])
     op.create_index("ix_bookings_starts_at", "bookings", ["starts_at"])
     op.create_index("ix_bookings_status", "bookings", ["status"])
@@ -368,3 +377,4 @@ def downgrade() -> None:
     op.drop_table("meeting_types")
     op.drop_index("ix_users_telegram_id", table_name="users")
     op.drop_table("users")
+    op.execute("DROP SEQUENCE IF EXISTS booking_display_number_seq")

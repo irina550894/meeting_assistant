@@ -194,16 +194,20 @@ class SqlAlchemyTelegramRuntimeStore:
                         result.booking.previous_booking_id,
                         now=result.booking.updated_at or result.booking.created_at,
                     )
-                await _upsert_booking(session, result.booking)
+                model = await _upsert_booking(session, result.booking)
                 await _upsert_reservation(session, result.reservation)
                 await _insert_audit_entries(session, result.audit_entries)
+                await session.flush()
+                result.booking.display_number = model.display_number
 
     async def save_booking(self, booking: BookingRecord) -> None:
         async with self.session_factory() as session:
             async with session.begin():
-                await _upsert_booking(session, booking)
+                model = await _upsert_booking(session, booking)
                 if booking.reservation is not None:
                     await _upsert_reservation(session, booking.reservation)
+                await session.flush()
+                booking.display_number = model.display_number
 
     async def save_audit_entries(self, entries: list[AuditEntry]) -> None:
         async with self.session_factory() as session:
@@ -369,11 +373,13 @@ def _apply_user_fields(model: User, user: UserProfile) -> None:
         model.updated_at = user.updated_at
 
 
-async def _upsert_booking(session: AsyncSession, booking: BookingRecord) -> None:
+async def _upsert_booking(session: AsyncSession, booking: BookingRecord) -> Booking:
     model = await session.get(Booking, booking.id)
     if model is None:
         model = Booking(id=booking.id)
         session.add(model)
+    if booking.display_number is not None:
+        model.display_number = booking.display_number
     model.user_id = booking.user_id
     model.meeting_type_id = booking.meeting_type_id
     model.duration_minutes = booking.duration_minutes
@@ -393,6 +399,7 @@ async def _upsert_booking(session: AsyncSession, booking: BookingRecord) -> None
         model.created_at = booking.created_at
     if booking.updated_at is not None:
         model.updated_at = booking.updated_at
+    return model
 
 
 async def _upsert_reservation(session: AsyncSession, reservation: SlotReservation) -> None:
@@ -596,6 +603,7 @@ def _booking_record(booking: Booking) -> BookingRecord:
     reservation = _reservation_record(booking.reservation) if booking.reservation else None
     return BookingRecord(
         id=booking.id,
+        display_number=booking.display_number,
         user_id=booking.user_id,
         meeting_type_id=booking.meeting_type_id,
         duration_minutes=booking.duration_minutes,

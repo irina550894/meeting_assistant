@@ -193,7 +193,7 @@ class GoogleCalendarClient:
             attendees.append({"email": self.settings.google_admin_email})
         username = f"@{user.telegram_username}" if user.telegram_username else "username не указан"
         description_parts = [
-            f"Заявка: {booking.id}",
+            f"Заявка: {_booking_number_label(booking)}",
             f"Имя: {user.full_name or '-'}",
             f"Telegram: {username}",
             f"Email: {user.email or '-'}",
@@ -279,3 +279,9 @@ def _parse_google_datetime(value: str, timezone: str) -> datetime:
             tzinfo=ZoneInfo(timezone),
         )
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _booking_number_label(booking: BookingRecord) -> str:
+    if booking.display_number is not None:
+        return f"№{booking.display_number}"
+    return str(booking.id)

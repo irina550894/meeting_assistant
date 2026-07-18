@@ -47,6 +47,7 @@ class FakeAdminBookingUseCases:
         )
         self.pending_booking = BookingRecord(
             id=uuid4(),
+            display_number=8,
             user_id=CLIENT.id,
             meeting_type_id=self.meeting_type.id,
             duration_minutes=60,
@@ -58,6 +59,7 @@ class FakeAdminBookingUseCases:
         )
         self.confirmed_booking = BookingRecord(
             id=uuid4(),
+            display_number=9,
             user_id=CLIENT.id,
             meeting_type_id=self.meeting_type.id,
             duration_minutes=30,
@@ -223,7 +225,9 @@ def test_admin_dashboard_returns_metrics_and_lists() -> None:
     assert body["metrics"]["pending"] == 1
     assert body["metrics"]["confirmed"] == 1
     assert body["upcoming"][0]["id"] == str(booking_use_cases.confirmed_booking.id)
+    assert body["upcoming"][0]["display_number"] == 9
     assert body["recent_pending"][0]["id"] == str(booking_use_cases.pending_booking.id)
+    assert body["recent_pending"][0]["display_number"] == 8
 
 
 def test_admin_list_bookings_can_filter_by_status() -> None:
@@ -235,6 +239,7 @@ def test_admin_list_bookings_can_filter_by_status() -> None:
     items = response.json()["items"]
     assert len(items) == 1
     assert items[0]["booking"]["id"] == str(booking_use_cases.pending_booking.id)
+    assert items[0]["booking"]["display_number"] == 8
     assert items[0]["user"]["telegram_id"] == CLIENT.telegram_id
     assert items[0]["meeting_type"]["allowed_durations_minutes"] == [30, 60]
 

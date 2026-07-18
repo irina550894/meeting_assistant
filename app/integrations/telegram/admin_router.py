@@ -859,6 +859,7 @@ def _booking_card_text(card: AdminBookingCard) -> str:
     return "\n".join(
         [
             "Заявка на встречу",
+            f"Номер: {_booking_number_label(booking)}",
             f"Имя: {user.full_name or '-'}",
             f"Telegram: {username}",
             f"Email: {user.email or '-'}",
@@ -903,6 +904,12 @@ def _log_google_calendar_error(error: GoogleCalendarError, *, operation: str) ->
             "error_type": type(error).__name__,
         },
     )
+
+
+def _booking_number_label(booking: BookingRecord) -> str:
+    if booking.display_number is not None:
+        return f"№{booking.display_number}"
+    return str(booking.id)
 
 
 async def _answer(callback: CallbackQuery, text: str, **kwargs) -> None:

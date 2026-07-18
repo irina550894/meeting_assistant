@@ -253,6 +253,7 @@ def _job_record(job: BackgroundJob) -> BackgroundJobRecord:
 def _booking_record(booking: Booking) -> BookingRecord:
     return BookingRecord(
         id=booking.id,
+        display_number=booking.display_number,
         user_id=booking.user_id,
         meeting_type_id=booking.meeting_type_id,
         duration_minutes=booking.duration_minutes,

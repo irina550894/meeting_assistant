@@ -1120,8 +1120,10 @@ function BookingsScreen({
             onClick={() => onSelect(booking)}
           >
             <div>
-              <strong>{statusLabel(booking.status)}</strong>
-              <span>{dateTimeLabel(booking.starts_at)}</span>
+              <strong>{bookingNumberLabel(booking)}</strong>
+              <span>
+                {statusLabel(booking.status)} · {dateTimeLabel(booking.starts_at)}
+              </span>
             </div>
             {booking.meeting_url ? <LinkIcon size={20} aria-hidden="true" /> : <CheckCircle2 size={20} aria-hidden="true" />}
           </button>
@@ -1130,7 +1132,10 @@ function BookingsScreen({
 
       {selectedBooking ? (
         <div className="detail-panel">
-          <PanelHeader title="Карточка заявки" action={statusLabel(selectedBooking.status)} />
+          <PanelHeader
+            title={`Заявка ${bookingNumberLabel(selectedBooking)}`}
+            action={statusLabel(selectedBooking.status)}
+          />
           <ReviewRow label="Дата" value={dateTimeLabel(selectedBooking.starts_at)} />
           <ReviewRow label="Длительность" value={`${selectedBooking.duration_minutes} минут`} />
           <ReviewRow label="Комментарий" value={selectedBooking.user_comment || "Без комментария"} />
@@ -1190,8 +1195,10 @@ function CalendarScreen({ bookings }: { bookings: MiniAppBooking[] }) {
         {upcoming.slice(0, 4).map((booking) => (
           <div key={booking.id} className="booking-row">
             <div>
-              <strong>{statusLabel(booking.status)}</strong>
-              <span>{dateTimeLabel(booking.starts_at)}</span>
+              <strong>{bookingNumberLabel(booking)}</strong>
+              <span>
+                {statusLabel(booking.status)} · {dateTimeLabel(booking.starts_at)}
+              </span>
             </div>
             <Clock3 size={18} aria-hidden="true" />
           </div>
@@ -1464,9 +1471,10 @@ function AdminRequestsView({
             onClick={() => onSelectCard(card)}
           >
             <div>
-              <strong>{card.user.full_name || card.user.telegram_username || "Пользователь"}</strong>
+              <strong>{bookingNumberLabel(card.booking)}</strong>
               <span>
-                {statusLabel(card.booking.status)} · {dateTimeLabel(card.booking.starts_at)}
+                {card.user.full_name || card.user.telegram_username || "Пользователь"} ·{" "}
+                {dateTimeLabel(card.booking.starts_at)}
               </span>
             </div>
             <span>{card.meeting_type.name}</span>
@@ -1475,7 +1483,10 @@ function AdminRequestsView({
       </div>
       {selectedCard ? (
         <div className="detail-panel">
-          <PanelHeader title="Заявка" action={statusLabel(selectedCard.booking.status)} />
+          <PanelHeader
+            title={`Заявка ${bookingNumberLabel(selectedCard.booking)}`}
+            action={statusLabel(selectedCard.booking.status)}
+          />
           <ReviewRow label="Клиент" value={selectedCard.user.full_name || "Без имени"} />
           <ReviewRow label="Email" value={selectedCard.user.email || "Не указан"} />
           <ReviewRow label="Тип" value={selectedCard.meeting_type.name} />
@@ -1542,7 +1553,7 @@ function AdminCalendarView({ bookings }: { bookings: MiniAppBooking[] }) {
         {bookings.map((booking) => (
           <div key={booking.id} className="booking-row">
             <div>
-              <strong>{dateTimeLabel(booking.starts_at)}</strong>
+              <strong>{bookingNumberLabel(booking)}</strong>
               <span>{booking.meeting_url ? "Meet ссылка есть" : "Без ссылки"}</span>
             </div>
             <CalendarDays size={18} aria-hidden="true" />
@@ -2062,6 +2073,10 @@ function statusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
+function bookingNumberLabel(booking: MiniAppBooking): string {
+  return booking.display_number ? `№${booking.display_number}` : "№-";
+}
+
 function dateLabel(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
@@ -2156,6 +2171,7 @@ function previewSlots(date: string): MiniAppSlot[] {
 function previewCreatedBooking(payload: BookingCreatePayload): MiniAppBooking {
   return {
     id: `preview-${Date.now()}`,
+    display_number: Math.floor(Date.now() / 1000),
     status: "pending",
     meeting_type_id: payload.meeting_type_id,
     duration_minutes: payload.duration_minutes,
@@ -2178,6 +2194,7 @@ function previewBookings(): MiniAppBooking[] {
   return [
     {
       id: "preview-1",
+      display_number: 1,
       status: "pending",
       meeting_type_id: "preview-consultation",
       duration_minutes: 60,
@@ -2195,6 +2212,7 @@ function previewBookings(): MiniAppBooking[] {
     },
     {
       id: "preview-2",
+      display_number: 2,
       status: "confirmed",
       meeting_type_id: "preview-diagnostics",
       duration_minutes: 60,
