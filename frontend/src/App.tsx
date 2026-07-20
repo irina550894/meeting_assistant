@@ -4,15 +4,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  FileText,
   LayoutDashboard,
-  Link as LinkIcon,
   Loader2,
   MessageSquare,
-  RefreshCw,
   ShieldCheck,
-  Sparkles,
-  UserRound,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -23,7 +18,6 @@ import {
   addAdminMeetingType,
   addClosedDayRestriction,
   addTimeIntervalRestriction,
-  cancelBooking,
   confirmAdminBooking,
   createBooking,
   deleteScheduleRestriction,
@@ -41,7 +35,6 @@ import {
   loadSlots,
   loadWorkingHours,
   miniAppAuth,
-  prepareReschedule,
   rejectAdminBooking,
   setAdminMeetingTypeActive,
   trackMiniAppEvent,
@@ -63,7 +56,7 @@ import type {
   MiniAppWorkingHours,
 } from "./types";
 
-type TabId = "home" | "bookings" | "calendar" | "admin" | "profile";
+type TabId = "home" | "calendar" | "admin";
 type FormStep = "details" | "slot" | "review";
 type DateViewMode = "month" | "time";
 type ToastTone = "success" | "error" | "info";
@@ -91,10 +84,8 @@ type Tab = {
 
 const tabs: Tab[] = [
   { id: "home", label: "Запись", icon: LayoutDashboard },
-  { id: "bookings", label: "Заявки", icon: FileText },
-  { id: "calendar", label: "Календарь", icon: CalendarDays },
+  { id: "calendar", label: "Заявки", icon: CalendarDays },
   { id: "admin", label: "Админ", icon: ShieldCheck, adminOnly: true },
-  { id: "profile", label: "Профиль", icon: UserRound },
 ];
 
 const MAX_ACTIVE_BOOKINGS = 10;
@@ -145,8 +136,7 @@ export function App() {
   const [slots, setSlots] = useState<MiniAppSlot[]>([]);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [formStep, setFormStep] = useState<FormStep>("details");
-  const [selectedBooking, setSelectedBooking] = useState<MiniAppBooking | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
+  const [personalDataConsentChecked, setPersonalDataConsentChecked] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [adminView, setAdminView] = useState<AdminView>("dashboard");
@@ -238,6 +228,7 @@ export function App() {
       setBookings(currentBookings);
       setMeetingTypes(loadedTypes);
       setAuth({ status: "ready", config: loadedConfig, user: profile });
+      setPersonalDataConsentChecked(profile.has_consent);
       setForm((current) => ({
         ...current,
         fullName: profile.full_name || "",
@@ -291,9 +282,9 @@ export function App() {
     }
   }
 
-  async function handleConsent() {
+  async function handleConsent(): Promise<boolean> {
     if (!user) {
-      return;
+      return false;
     }
     setIsBusy(true);
     try {
@@ -309,11 +300,27 @@ export function App() {
         );
       }
       showToast("success", "Согласие принято");
+      return true;
     } catch (error) {
       showToast("error", errorText(error));
+      return false;
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function handleProceedFromDetails() {
+    if (!personalDataConsentChecked) {
+      showToast("error", "Нужно дать согласие на обработку персональных данных");
+      return;
+    }
+    if (!user?.has_consent) {
+      const accepted = await handleConsent();
+      if (!accepted) {
+        return;
+      }
+    }
+    setFormStep("slot");
   }
 
   async function submitBooking() {
@@ -345,50 +352,11 @@ export function App() {
       });
       setSlots([]);
       setFormStep("details");
-      setActiveTab("bookings");
+      setActiveTab("calendar");
       showToast("success", form.previousBookingId ? "Запрос переноса отправлен" : "Заявка создана");
       if (!isPreview) {
         await refreshBookings();
       }
-    } catch (error) {
-      showToast("error", errorText(error));
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleCancelBooking(booking: MiniAppBooking) {
-    setIsBusy(true);
-    try {
-      const updated = isPreview
-        ? { ...booking, status: "cancelled_by_user", cancellation_reason: cancelReason || null }
-        : await cancelBooking(booking.id, cancelReason.trim() || null);
-      setBookings((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setSelectedBooking(updated);
-      setCancelReason("");
-      showToast("success", "Заявка отменена");
-    } catch (error) {
-      showToast("error", errorText(error));
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleReschedule(booking: MiniAppBooking) {
-    setIsBusy(true);
-    try {
-      const prepared = isPreview ? booking : await prepareReschedule(booking.id);
-      setForm((current) => ({
-        ...current,
-        previousBookingId: prepared.id,
-        meetingTypeId: prepared.meeting_type_id,
-        durationMinutes: prepared.duration_minutes,
-        comment: "Запрос переноса встречи",
-      }));
-      setSelectedBooking(null);
-      setFormStep("slot");
-      setActiveTab("home");
-      showToast("info", "Выберите новую дату и время");
     } catch (error) {
       showToast("error", errorText(error));
     } finally {
@@ -660,127 +628,91 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <Header user={user} bookings={bookings} isPreview={isPreview} />
+      <Header isPreview={isPreview} />
 
-      {!user.has_consent ? (
-        <ConsentScreen
-          consentUrl={config?.consent_url}
-          policyUrl={config?.policy_url}
-          isBusy={isBusy}
-          onAccept={() => void handleConsent()}
-        />
-      ) : (
-        <>
-          <section className="metrics-grid" aria-label="Сводка">
-            <MetricCard label="Активные" value={String(activeBookings(bookings))} tone="green" />
-            <MetricCard label="Ожидают" value={String(pendingBookings(bookings))} tone="purple" />
-            <MetricCard label="Ближайшая" value={nextBookingLabel(bookings)} tone="peach" />
-          </section>
-
-          <section className="content-panel">
-            {activeTab === "home" ? (
-              <BookingForm
-                form={form}
-                formStep={formStep}
-                isBusy={isBusy}
-                meetingTypes={meetingTypes}
-                availableDates={availableDates}
-                slots={slots}
-                activeBookingsCount={activeBookings(bookings)}
-                onChange={setForm}
-                onStepChange={setFormStep}
-                onSubmit={() => void submitBooking()}
-              />
-            ) : null}
-            {activeTab === "bookings" ? (
-              <BookingsScreen
-                bookings={bookings}
-                selectedBooking={selectedBooking}
-                cancelReason={cancelReason}
-                isBusy={isBusy}
-                onSelect={setSelectedBooking}
-                onCancelReasonChange={setCancelReason}
-                onCancel={(booking) => void handleCancelBooking(booking)}
-                onReschedule={(booking) => void handleReschedule(booking)}
-              />
-            ) : null}
-            {activeTab === "calendar" ? <CalendarScreen bookings={bookings} /> : null}
-            {activeTab === "admin" ? (
-              <AdminScreen
-                view={adminView}
-                dashboard={adminDashboard}
-                cards={adminBookings}
-                calendar={adminCalendar}
-                selectedCard={selectedAdminCard}
-                statusFilter={adminStatusFilter}
-                meetingUrl={adminMeetingUrl}
-                rejectReason={adminRejectReason}
-                scheduleSettings={scheduleSettings}
-                workingHours={workingHours}
-                restrictions={restrictions}
-                newClosedDay={newClosedDay}
-                newClosedDayComment={newClosedDayComment}
-                newClosedHoursDate={newClosedHoursDate}
-                newClosedHoursStart={newClosedHoursStart}
-                newClosedHoursEnd={newClosedHoursEnd}
-                newClosedHoursComment={newClosedHoursComment}
-                meetingTypes={adminMeetingTypes}
-                newMeetingTypeName={newMeetingTypeName}
-                newMeetingTypeDurations={newMeetingTypeDurations}
-                isBusy={isBusy}
-                onViewChange={setAdminView}
-                onStatusFilterChange={setAdminStatusFilter}
-                onSelectCard={setSelectedAdminCard}
-                onMeetingUrlChange={setAdminMeetingUrl}
-                onRejectReasonChange={setAdminRejectReason}
-                onConfirm={(card) => void handleAdminConfirm(card)}
-                onReject={(card) => void handleAdminReject(card)}
-                onNewClosedDayChange={setNewClosedDay}
-                onNewClosedDayCommentChange={setNewClosedDayComment}
-                onAddClosedDay={() => void handleAddClosedDay()}
-                onNewClosedHoursDateChange={setNewClosedHoursDate}
-                onNewClosedHoursStartChange={setNewClosedHoursStart}
-                onNewClosedHoursEndChange={setNewClosedHoursEnd}
-                onNewClosedHoursCommentChange={setNewClosedHoursComment}
-                onAddClosedHours={() => void handleAddClosedHours()}
-                onDeleteRestriction={(id) => void handleDeleteRestriction(id)}
-                onNewMeetingTypeNameChange={setNewMeetingTypeName}
-                onNewMeetingTypeDurationsChange={setNewMeetingTypeDurations}
-                onAddMeetingType={() => void handleAddMeetingType()}
-                onToggleMeetingType={(type) => void handleToggleMeetingType(type)}
-              />
-            ) : null}
-            {activeTab === "profile" ? <ProfileScreen user={user} config={config} /> : null}
-          </section>
-        </>
-      )}
+      <section className="content-panel">
+        {activeTab === "home" ? (
+          <BookingForm
+            form={form}
+            formStep={formStep}
+            isBusy={isBusy}
+            meetingTypes={meetingTypes}
+            availableDates={availableDates}
+            slots={slots}
+            activeBookingsCount={activeBookings(bookings)}
+            consentChecked={personalDataConsentChecked}
+            consentUrl={config?.consent_url}
+            policyUrl={config?.policy_url}
+            onConsentCheckedChange={setPersonalDataConsentChecked}
+            onChange={setForm}
+            onStepChange={setFormStep}
+            onProceedFromDetails={() => void handleProceedFromDetails()}
+            onSubmit={() => void submitBooking()}
+          />
+        ) : null}
+        {activeTab === "calendar" ? (
+          <CalendarScreen bookings={bookings} meetingTypes={meetingTypes} />
+        ) : null}
+        {activeTab === "admin" ? (
+          <AdminScreen
+            view={adminView}
+            dashboard={adminDashboard}
+            cards={adminBookings}
+            calendar={adminCalendar}
+            selectedCard={selectedAdminCard}
+            statusFilter={adminStatusFilter}
+            meetingUrl={adminMeetingUrl}
+            rejectReason={adminRejectReason}
+            scheduleSettings={scheduleSettings}
+            workingHours={workingHours}
+            restrictions={restrictions}
+            newClosedDay={newClosedDay}
+            newClosedDayComment={newClosedDayComment}
+            newClosedHoursDate={newClosedHoursDate}
+            newClosedHoursStart={newClosedHoursStart}
+            newClosedHoursEnd={newClosedHoursEnd}
+            newClosedHoursComment={newClosedHoursComment}
+            meetingTypes={adminMeetingTypes}
+            newMeetingTypeName={newMeetingTypeName}
+            newMeetingTypeDurations={newMeetingTypeDurations}
+            isBusy={isBusy}
+            onViewChange={setAdminView}
+            onStatusFilterChange={setAdminStatusFilter}
+            onSelectCard={setSelectedAdminCard}
+            onMeetingUrlChange={setAdminMeetingUrl}
+            onRejectReasonChange={setAdminRejectReason}
+            onConfirm={(card) => void handleAdminConfirm(card)}
+            onReject={(card) => void handleAdminReject(card)}
+            onNewClosedDayChange={setNewClosedDay}
+            onNewClosedDayCommentChange={setNewClosedDayComment}
+            onAddClosedDay={() => void handleAddClosedDay()}
+            onNewClosedHoursDateChange={setNewClosedHoursDate}
+            onNewClosedHoursStartChange={setNewClosedHoursStart}
+            onNewClosedHoursEndChange={setNewClosedHoursEnd}
+            onNewClosedHoursCommentChange={setNewClosedHoursComment}
+            onAddClosedHours={() => void handleAddClosedHours()}
+            onDeleteRestriction={(id) => void handleDeleteRestriction(id)}
+            onNewMeetingTypeNameChange={setNewMeetingTypeName}
+            onNewMeetingTypeDurationsChange={setNewMeetingTypeDurations}
+            onAddMeetingType={() => void handleAddMeetingType()}
+            onToggleMeetingType={(type) => void handleToggleMeetingType(type)}
+          />
+        ) : null}
+      </section>
 
       {toast ? <ToastMessage toast={toast} /> : null}
-      {user.has_consent ? (
-        <BottomNav tabs={visibleTabs} activeTab={activeTab} onChange={setActiveTab} />
-      ) : null}
+      <BottomNav tabs={visibleTabs} activeTab={activeTab} onChange={setActiveTab} />
     </main>
   );
 }
 
-function Header({
-  user,
-  bookings,
-  isPreview,
-}: {
-  user: MiniAppUser;
-  bookings: MiniAppBooking[];
-  isPreview: boolean;
-}) {
+function Header({ isPreview }: { isPreview: boolean }) {
   return (
     <>
       <section className="top-panel">
         <div>
-          <p className="eyebrow">Ассистент встреч</p>
-          <h1>{greeting(user)}</h1>
-        </div>
-        <div className="profile-chip">
-          <span>{initials(user)}</span>
+          <h1>Добрый день!</h1>
+          <p>В данном приложении Вы можете записаться на встречу с Ириной Бирюковой</p>
         </div>
       </section>
       {isPreview ? (
@@ -789,49 +721,7 @@ function Header({
           через Mini App.
         </div>
       ) : null}
-      {nextConfirmedMeeting(bookings)?.meeting_url ? (
-        <a className="meeting-link" href={nextConfirmedMeeting(bookings)?.meeting_url ?? "#"}>
-          <LinkIcon size={18} aria-hidden="true" />
-          <span>Ссылка на ближайшую встречу</span>
-        </a>
-      ) : null}
     </>
-  );
-}
-
-function ConsentScreen({
-  consentUrl,
-  policyUrl,
-  isBusy,
-  onAccept,
-}: {
-  consentUrl: string | null | undefined;
-  policyUrl: string | null | undefined;
-  isBusy: boolean;
-  onAccept: () => void;
-}) {
-  return (
-    <section className="content-panel consent-panel">
-      <div className="booking-icon">
-        <ShieldCheck size={24} aria-hidden="true" />
-      </div>
-      <h2>Согласие на обработку данных</h2>
-      <p>
-        Для записи на встречу нужно подтвердить согласие одной кнопкой. Ссылки на документы
-        доступны ниже.
-      </p>
-      <button type="button" className="primary-button" disabled={isBusy} onClick={onAccept}>
-        {isBusy ? "Сохраняем..." : "Принимаю и продолжаю"}
-      </button>
-      <div className="legal-links">
-        <a href={consentUrl ?? "#"} target="_blank" rel="noreferrer">
-          Согласие на обработку
-        </a>
-        <a href={policyUrl ?? "#"} target="_blank" rel="noreferrer">
-          Политика конфиденциальности
-        </a>
-      </div>
-    </section>
   );
 }
 
@@ -843,8 +733,13 @@ function BookingForm({
   availableDates,
   slots,
   activeBookingsCount,
+  consentChecked,
+  consentUrl,
+  policyUrl,
+  onConsentCheckedChange,
   onChange,
   onStepChange,
+  onProceedFromDetails,
   onSubmit,
 }: {
   form: BookingFormState;
@@ -854,8 +749,13 @@ function BookingForm({
   availableDates: string[];
   slots: MiniAppSlot[];
   activeBookingsCount: number;
+  consentChecked: boolean;
+  consentUrl: string | null | undefined;
+  policyUrl: string | null | undefined;
+  onConsentCheckedChange: (checked: boolean) => void;
   onChange: (next: BookingFormState) => void;
   onStepChange: (step: FormStep) => void;
+  onProceedFromDetails: () => void;
   onSubmit: () => void;
 }) {
   const selectedMeetingType = meetingTypes.find((item) => item.id === form.meetingTypeId);
@@ -963,11 +863,34 @@ function BookingForm({
               placeholder="Что важно обсудить"
             />
           </label>
+          <label className="consent-checkbox">
+            <input
+              type="checkbox"
+              checked={consentChecked}
+              onChange={(event) => onConsentCheckedChange(event.target.checked)}
+            />
+            <span>
+              Даю согласие на обработку персональных данных для связи со мной и разбора заявки,
+              принимаю{" "}
+              <a href={policyUrl ?? "#"} target="_blank" rel="noreferrer">
+                политику конфиденциальности
+              </a>
+              {consentUrl ? (
+                <>
+                  {" "}и{" "}
+                  <a href={consentUrl} target="_blank" rel="noreferrer">
+                    согласие на обработку
+                  </a>
+                </>
+              ) : null}
+              .
+            </span>
+          </label>
           <button
             type="button"
             className="primary-button"
-            onClick={() => onStepChange("slot")}
-            disabled={!form.fullName || !form.email || !form.meetingTypeId}
+            onClick={onProceedFromDetails}
+            disabled={!form.fullName || !form.email || !form.meetingTypeId || !consentChecked || isBusy}
           >
             Выбрать дату и время
           </button>
@@ -1059,14 +982,19 @@ function BookingForm({
               ) : null}
             </>
           ) : null}
-          <button
-            type="button"
-            className="primary-button"
-            disabled={!form.slotKey || isBusy || activeLimitReached}
-            onClick={() => onStepChange("review")}
-          >
-            Проверить заявку
-          </button>
+          <div className="action-row form-action-row">
+            <button type="button" className="secondary-button" onClick={() => onStepChange("details")}>
+              Назад
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={!form.slotKey || isBusy || activeLimitReached}
+              onClick={() => onStepChange("review")}
+            >
+              Проверить заявку
+            </button>
+          </div>
           {activeLimitReached ? (
             <p className="panel-copy">Сейчас можно иметь не больше {MAX_ACTIVE_BOOKINGS} активных заявок.</p>
           ) : null}
@@ -1080,152 +1008,49 @@ function BookingForm({
           <ReviewRow label="Тип" value={selectedMeetingType?.name ?? "Не выбран"} />
           <ReviewRow label="Время" value={selected ? dateTimeLabel(selected.starts_at) : "Не выбрано"} />
           <ReviewRow label="Комментарий" value={form.comment || "Без комментария"} />
-          <button type="button" className="primary-button" disabled={isBusy} onClick={onSubmit}>
-            {isBusy ? "Отправляем..." : form.previousBookingId ? "Отправить перенос" : "Отправить заявку"}
-          </button>
+          <div className="action-row form-action-row">
+            <button type="button" className="secondary-button" onClick={() => onStepChange("slot")}>
+              Назад
+            </button>
+            <button type="button" className="primary-button" disabled={isBusy} onClick={onSubmit}>
+              {isBusy ? "Отправляем..." : form.previousBookingId ? "Отправить перенос" : "Отправить заявку"}
+            </button>
+          </div>
         </div>
       ) : null}
     </>
   );
 }
 
-function BookingsScreen({
+function CalendarScreen({
   bookings,
-  selectedBooking,
-  cancelReason,
-  isBusy,
-  onSelect,
-  onCancelReasonChange,
-  onCancel,
-  onReschedule,
+  meetingTypes,
 }: {
   bookings: MiniAppBooking[];
-  selectedBooking: MiniAppBooking | null;
-  cancelReason: string;
-  isBusy: boolean;
-  onSelect: (booking: MiniAppBooking | null) => void;
-  onCancelReasonChange: (value: string) => void;
-  onCancel: (booking: MiniAppBooking) => void;
-  onReschedule: (booking: MiniAppBooking) => void;
+  meetingTypes: MiniAppMeetingType[];
 }) {
-  return (
-    <>
-      <PanelHeader title="Мои заявки" action={`${bookings.length}`} />
-      <div className="timeline-list">
-        {(bookings.length ? bookings : previewBookings()).map((booking) => (
-          <button
-            key={booking.id}
-            type="button"
-            className="booking-row booking-row-button"
-            onClick={() => onSelect(booking)}
-          >
-            <div>
-              <strong>{bookingNumberLabel(booking)}</strong>
-              <span>
-                {statusLabel(booking.status)} · {dateTimeLabel(booking.starts_at)}
-              </span>
-            </div>
-            {booking.meeting_url ? <LinkIcon size={20} aria-hidden="true" /> : <CheckCircle2 size={20} aria-hidden="true" />}
-          </button>
-        ))}
-      </div>
-
-      {selectedBooking ? (
-        <div className="detail-panel">
-          <PanelHeader
-            title={`Заявка ${bookingNumberLabel(selectedBooking)}`}
-            action={statusLabel(selectedBooking.status)}
-          />
-          <ReviewRow label="Дата" value={dateTimeLabel(selectedBooking.starts_at)} />
-          <ReviewRow label="Длительность" value={`${selectedBooking.duration_minutes} минут`} />
-          <ReviewRow label="Комментарий" value={selectedBooking.user_comment || "Без комментария"} />
-          {selectedBooking.meeting_url ? (
-            <a className="meeting-link inline-link" href={selectedBooking.meeting_url} target="_blank" rel="noreferrer">
-              <LinkIcon size={18} aria-hidden="true" />
-              Google Meet / Calendar
-            </a>
-          ) : null}
-          {isCancellable(selectedBooking) ? (
-            <label className="wide-field">
-              <span>Причина отмены</span>
-              <textarea
-                value={cancelReason}
-                onChange={(event) => onCancelReasonChange(event.target.value)}
-                placeholder="Можно оставить пустым"
-              />
-            </label>
-          ) : null}
-          <div className="action-row">
-            {isCancellable(selectedBooking) ? (
-              <button type="button" className="danger-button" disabled={isBusy} onClick={() => onCancel(selectedBooking)}>
-                <XCircle size={18} aria-hidden="true" />
-                Отменить
-              </button>
-            ) : null}
-            {isReschedulable(selectedBooking) ? (
-              <button type="button" className="secondary-button" disabled={isBusy} onClick={() => onReschedule(selectedBooking)}>
-                <RefreshCw size={18} aria-hidden="true" />
-                Перенести
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function CalendarScreen({ bookings }: { bookings: MiniAppBooking[] }) {
-  const upcoming = bookings
-    .filter((booking) => ["pending", "confirmed", "reschedule_requested"].includes(booking.status))
-    .sort((left, right) => left.starts_at.localeCompare(right.starts_at));
+  const visibleBookings = (bookings.length ? bookings : previewBookings()).slice().sort((left, right) => {
+    const leftValue = left.created_at ?? left.starts_at;
+    const rightValue = right.created_at ?? right.starts_at;
+    return rightValue.localeCompare(leftValue);
+  });
 
   return (
     <>
-      <PanelHeader title="Календарь" action="План" />
-      <div className="calendar-card">
-        {previewDates().slice(0, 5).map((date, index) => (
-          <div key={date} className={index === 2 ? "calendar-day selected" : "calendar-day"}>
-            <span>{weekdayLabel(date)}</span>
-            <strong>{dayLabel(date)}</strong>
-          </div>
-        ))}
-      </div>
+      <PanelHeader title="Мои заявки" action={`${visibleBookings.length}`} />
       <div className="timeline-list compact-list">
-        {upcoming.slice(0, 4).map((booking) => (
+        {visibleBookings.map((booking) => (
           <div key={booking.id} className="booking-row">
             <div>
               <strong>{bookingNumberLabel(booking)}</strong>
-              <span>
-                {statusLabel(booking.status)} · {dateTimeLabel(booking.starts_at)}
-              </span>
+              <span>Тип: {bookingTypeName(meetingTypes, booking)}</span>
+              <span>Дата: {dateLabel(booking.starts_at)}</span>
+              <span>Время: {timeLabel(booking.starts_at)}</span>
+              <span>Статус: {statusLabel(booking.status)}</span>
             </div>
             <Clock3 size={18} aria-hidden="true" />
           </div>
         ))}
-      </div>
-    </>
-  );
-}
-
-function ProfileScreen({ user, config }: { user: MiniAppUser; config: MiniAppConfig | null }) {
-  return (
-    <>
-      <PanelHeader title="Профиль" action={user.is_admin ? "Админ" : "Пользователь"} />
-      <div className="profile-panel">
-        <div className="profile-avatar">{initials(user)}</div>
-        <div>
-          <strong>{user.full_name || user.telegram_username || "Пользователь"}</strong>
-          <span>{user.has_consent ? "Согласие принято" : "Согласие ожидается"}</span>
-        </div>
-      </div>
-      <div className="legal-links profile-links">
-        <a href={config?.consent_url ?? "#"} target="_blank" rel="noreferrer">
-          Согласие на обработку
-        </a>
-        <a href={config?.policy_url ?? "#"} target="_blank" rel="noreferrer">
-          Политика конфиденциальности
-        </a>
       </div>
     </>
   );
@@ -1853,23 +1678,6 @@ function PanelHeader({ title, action }: { title: string; action: string }) {
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "green" | "purple" | "peach";
-}) {
-  return (
-    <article className={`metric metric-${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="review-row">
@@ -2014,51 +1822,10 @@ function slotKey(slot: MiniAppSlot): string {
   return `${slot.starts_at}|${slot.ends_at}`;
 }
 
-function greeting(user: MiniAppUser): string {
-  const name = user.full_name || user.telegram_username || "гость";
-  return `Здравствуйте, ${name}`;
-}
-
-function initials(user: MiniAppUser): string {
-  const source = user.full_name || user.telegram_username || "MA";
-  return source
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
-
 function activeBookings(bookings: MiniAppBooking[]): number {
   return bookings.filter((booking) =>
     ["pending", "confirmed", "reschedule_requested"].includes(booking.status),
   ).length;
-}
-
-function pendingBookings(bookings: MiniAppBooking[]): number {
-  return bookings.filter((booking) => booking.status === "pending").length;
-}
-
-function nextBookingLabel(bookings: MiniAppBooking[]): string {
-  const next = nextConfirmedMeeting(bookings);
-  return next ? dateLabel(next.starts_at) : "Нет";
-}
-
-function nextConfirmedMeeting(bookings: MiniAppBooking[]): MiniAppBooking | null {
-  return (
-    bookings
-      .filter((booking) => booking.status === "confirmed")
-      .sort((left, right) => left.starts_at.localeCompare(right.starts_at))[0] ?? null
-  );
-}
-
-function isCancellable(booking: MiniAppBooking): boolean {
-  return ["pending", "confirmed"].includes(booking.status);
-}
-
-function isReschedulable(booking: MiniAppBooking): boolean {
-  return booking.status === "confirmed";
 }
 
 function statusLabel(status: string): string {
@@ -2077,10 +1844,25 @@ function bookingNumberLabel(booking: MiniAppBooking): string {
   return booking.display_number ? `№${booking.display_number}` : "№-";
 }
 
+function bookingTypeName(types: MiniAppMeetingType[], booking: MiniAppBooking): string {
+  return (
+    types.find((type) => type.id === booking.meeting_type_id)?.name ??
+    previewMeetingTypes.find((type) => type.id === booking.meeting_type_id)?.name ??
+    "Встреча"
+  );
+}
+
 function dateLabel(value: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
+  }).format(new Date(value));
+}
+
+function timeLabel(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 

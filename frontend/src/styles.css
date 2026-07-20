@@ -98,17 +98,13 @@ button:disabled {
   line-height: 1.12;
 }
 
-.profile-chip,
-.profile-avatar {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  border-radius: 16px;
-  background: #f2d09b;
-  color: #2b2147;
-  font-weight: 800;
+.top-panel p {
+  max-width: 440px;
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.42;
 }
 
 .notice {
@@ -122,62 +118,11 @@ button:disabled {
   line-height: 1.45;
 }
 
-.meeting-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(217, 192, 255, 0.64);
-  color: var(--purple);
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin: 16px 0;
-}
-
-.metric {
-  min-height: 86px;
-  padding: 14px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-}
-
-.metric span,
 .admin-tile span,
 .booking-row span,
-.profile-panel span,
 .panel-copy {
   color: var(--muted);
   font-size: 13px;
-}
-
-.metric strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 20px;
-  line-height: 1;
-}
-
-.metric-green {
-  background: var(--green);
-}
-
-.metric-purple {
-  background: var(--purple-soft);
-}
-
-.metric-peach {
-  background: var(--peach);
 }
 
 .content-panel {
@@ -198,7 +143,6 @@ button:disabled {
 }
 
 .panel-header h2,
-.booking-card h2,
 .center-screen h1 {
   margin: 0;
   font-size: 20px;
@@ -212,47 +156,6 @@ button:disabled {
   color: var(--purple);
   font-size: 12px;
   font-weight: 800;
-}
-
-.booking-card,
-.profile-panel {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: var(--panel-strong);
-}
-
-.consent-panel {
-  display: grid;
-  gap: 12px;
-  align-content: start;
-  margin-top: 16px;
-}
-
-.consent-panel p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.48;
-}
-
-.booking-card p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.booking-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--purple-soft), var(--rose));
-  color: var(--purple);
 }
 
 .primary-button {
@@ -329,6 +232,33 @@ button:disabled {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.consent-checkbox {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0 0;
+}
+
+.consent-checkbox input {
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  accent-color: var(--purple);
+}
+
+.consent-checkbox span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.consent-checkbox a {
+  color: var(--purple);
+  text-decoration: underline;
 }
 
 .form-grid input,
@@ -556,10 +486,6 @@ button:disabled {
   text-decoration: none;
 }
 
-.inline-link {
-  margin: 6px 0;
-}
-
 .calendar-card {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -642,20 +568,12 @@ button:disabled {
   gap: 8px;
 }
 
-.legal-links {
-  display: grid;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.legal-links a {
-  color: var(--purple);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.profile-links {
+.form-action-row {
   margin-top: 16px;
+}
+
+.form-action-row .primary-button {
+  margin-top: 0;
 }
 
 .toast {
@@ -697,8 +615,7 @@ button:disabled {
   background: linear-gradient(135deg, rgba(217, 192, 255, 0.7), rgba(242, 208, 155, 0.45));
 }
 
-.admin-tile strong,
-.profile-panel strong {
+.admin-tile strong {
   display: block;
   margin-top: 5px;
 }
@@ -809,10 +726,6 @@ button:disabled {
 
   .top-panel h1 {
     font-size: 21px;
-  }
-
-  .metrics-grid {
-    grid-template-columns: 1fr;
   }
 
   .date-strip {
