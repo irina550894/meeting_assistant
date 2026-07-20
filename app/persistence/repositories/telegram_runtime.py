@@ -238,6 +238,35 @@ class SqlAlchemyTelegramRuntimeStore:
             meeting_buffer_minutes=settings.meeting_buffer_minutes,
         )
 
+    async def update_schedule_settings(
+        self,
+        *,
+        booking_horizon_days: int,
+        slot_step_minutes: int,
+        meeting_buffer_minutes: int,
+    ) -> AdminScheduleSettings:
+        async with self.session_factory() as session:
+            async with session.begin():
+                row = await session.scalar(
+                    select(ScheduleSettingsModel).order_by(ScheduleSettingsModel.id)
+                )
+                if row is None:
+                    row = ScheduleSettingsModel(
+                        timezone=self.settings.app_timezone,
+                        min_booking_lead_days=self.settings.min_booking_lead_days,
+                    )
+                    session.add(row)
+                row.booking_horizon_days = booking_horizon_days
+                row.slot_step_minutes = slot_step_minutes
+                row.meeting_buffer_minutes = meeting_buffer_minutes
+            return AdminScheduleSettings(
+                timezone=row.timezone,
+                min_booking_lead_days=row.min_booking_lead_days,
+                booking_horizon_days=row.booking_horizon_days,
+                slot_step_minutes=row.slot_step_minutes,
+                meeting_buffer_minutes=row.meeting_buffer_minutes,
+            )
+
     async def list_working_hours(self) -> list[AdminWorkingHoursRule]:
         async with self.session_factory() as session:
             rows = await _working_hours(session)
@@ -250,6 +279,32 @@ class SqlAlchemyTelegramRuntimeStore:
             )
             for row in rows
         ]
+
+    async def update_working_hours(
+        self,
+        *,
+        weekday: int,
+        is_working_day: bool,
+        start_time: time | None,
+        end_time: time | None,
+    ) -> AdminWorkingHoursRule:
+        async with self.session_factory() as session:
+            async with session.begin():
+                row = await session.scalar(
+                    select(WorkingHours).where(WorkingHours.weekday == weekday)
+                )
+                if row is None:
+                    row = WorkingHours(weekday=weekday)
+                    session.add(row)
+                row.is_working_day = is_working_day
+                row.start_time = start_time
+                row.end_time = end_time
+            return AdminWorkingHoursRule(
+                weekday=row.weekday,
+                is_working_day=row.is_working_day,
+                start_time=row.start_time,
+                end_time=row.end_time,
+            )
 
     async def list_upcoming_restrictions(
         self,

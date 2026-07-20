@@ -39,6 +39,16 @@ class InMemoryRuntimeStore:
         self.meeting_types: dict[UUID, MeetingType] = {}
         self.restrictions: dict[UUID, AdminScheduleRestriction] = {}
         self.next_booking_display_number = 1
+        self.schedule_settings = AdminScheduleSettings(
+            timezone=self.settings.app_timezone,
+            min_booking_lead_days=self.settings.min_booking_lead_days,
+            booking_horizon_days=self.settings.booking_horizon_days,
+            slot_step_minutes=self.settings.slot_step_minutes,
+            meeting_buffer_minutes=self.settings.meeting_buffer_minutes,
+        )
+        self.working_hours = {
+            rule.weekday: rule for rule in self._default_working_hours()
+        }
         self._seed_meeting_types()
 
     async def get_by_telegram_id(self, telegram_id: int) -> UserProfile | None:
@@ -112,13 +122,13 @@ class InMemoryRuntimeStore:
     async def context_for_date(self, target_date: date) -> FlowScheduleContext:
         return FlowScheduleContext(
             settings=ScheduleSettings(
-                timezone=self.settings.app_timezone,
-                min_booking_lead_days=self.settings.min_booking_lead_days,
-                booking_horizon_days=self.settings.booking_horizon_days,
-                slot_step_minutes=self.settings.slot_step_minutes,
-                meeting_buffer_minutes=self.settings.meeting_buffer_minutes,
+                timezone=self.schedule_settings.timezone,
+                min_booking_lead_days=self.schedule_settings.min_booking_lead_days,
+                booking_horizon_days=self.schedule_settings.booking_horizon_days,
+                slot_step_minutes=self.schedule_settings.slot_step_minutes,
+                meeting_buffer_minutes=self.schedule_settings.meeting_buffer_minutes,
             ),
-            working_hours=self._default_working_hours(),
+            working_hours=list(self.working_hours.values()),
             restrictions=[
                 ScheduleRestriction(
                     restriction_date=restriction.restriction_date,
@@ -133,13 +143,23 @@ class InMemoryRuntimeStore:
         )
 
     async def get_schedule_settings(self) -> AdminScheduleSettings:
-        return AdminScheduleSettings(
-            timezone=self.settings.app_timezone,
-            min_booking_lead_days=self.settings.min_booking_lead_days,
-            booking_horizon_days=self.settings.booking_horizon_days,
-            slot_step_minutes=self.settings.slot_step_minutes,
-            meeting_buffer_minutes=self.settings.meeting_buffer_minutes,
+        return self.schedule_settings
+
+    async def update_schedule_settings(
+        self,
+        *,
+        booking_horizon_days: int,
+        slot_step_minutes: int,
+        meeting_buffer_minutes: int,
+    ) -> AdminScheduleSettings:
+        self.schedule_settings = AdminScheduleSettings(
+            timezone=self.schedule_settings.timezone,
+            min_booking_lead_days=self.schedule_settings.min_booking_lead_days,
+            booking_horizon_days=booking_horizon_days,
+            slot_step_minutes=slot_step_minutes,
+            meeting_buffer_minutes=meeting_buffer_minutes,
         )
+        return self.schedule_settings
 
     async def list_working_hours(self) -> list[AdminWorkingHoursRule]:
         return [
@@ -149,8 +169,25 @@ class InMemoryRuntimeStore:
                 start_time=rule.start_time,
                 end_time=rule.end_time,
             )
-            for rule in self._default_working_hours()
+            for rule in sorted(self.working_hours.values(), key=lambda item: item.weekday)
         ]
+
+    async def update_working_hours(
+        self,
+        *,
+        weekday: int,
+        is_working_day: bool,
+        start_time: time | None,
+        end_time: time | None,
+    ) -> AdminWorkingHoursRule:
+        row = AdminWorkingHoursRule(
+            weekday=weekday,
+            is_working_day=is_working_day,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        self.working_hours[weekday] = row
+        return row
 
     async def list_upcoming_restrictions(
         self,

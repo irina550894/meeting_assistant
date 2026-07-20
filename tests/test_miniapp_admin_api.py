@@ -132,6 +132,24 @@ class FakeAdminSettingsUseCases:
             meeting_buffer_minutes=15,
         )
 
+    async def update_schedule_settings(
+        self,
+        *,
+        booking_horizon_days: int,
+        slot_step_minutes: int,
+        meeting_buffer_minutes: int,
+    ):
+        self.last_booking_horizon_days = booking_horizon_days
+        self.last_slot_step_minutes = slot_step_minutes
+        self.last_meeting_buffer_minutes = meeting_buffer_minutes
+        return AdminScheduleSettings(
+            timezone="Europe/Moscow",
+            min_booking_lead_days=1,
+            booking_horizon_days=booking_horizon_days,
+            slot_step_minutes=slot_step_minutes,
+            meeting_buffer_minutes=meeting_buffer_minutes,
+        )
+
     async def list_working_hours(self):
         return [
             AdminWorkingHoursRule(
@@ -141,6 +159,32 @@ class FakeAdminSettingsUseCases:
                 end_time=time(18, 0),
             )
         ]
+
+    async def update_working_hours(
+        self,
+        *,
+        weekday: int,
+        is_working_day: bool,
+        start_time: time | None,
+        end_time: time | None,
+    ):
+        if is_working_day and (start_time is None or end_time is None or start_time >= end_time):
+            from app.application import AdminSettingsUseCaseError
+
+            raise AdminSettingsUseCaseError(
+                "invalid_working_hours",
+                "Working day start time must be before end time.",
+            )
+        self.last_weekday = weekday
+        self.last_is_working_day = is_working_day
+        self.last_start_time = start_time
+        self.last_end_time = end_time
+        return AdminWorkingHoursRule(
+            weekday=weekday,
+            is_working_day=is_working_day,
+            start_time=start_time,
+            end_time=end_time,
+        )
 
     async def list_restrictions(self, *, from_date: date):
         return [
@@ -277,7 +321,19 @@ def test_admin_schedule_settings_restrictions_and_working_hours() -> None:
     client, _, settings_use_cases = admin_api_client()
 
     settings_response = client.get("/api/miniapp/admin/schedule/settings")
+    settings_update_response = client.patch(
+        "/api/miniapp/admin/schedule/settings",
+        json={
+            "booking_horizon_days": 45,
+            "slot_step_minutes": 30,
+            "meeting_buffer_minutes": 20,
+        },
+    )
     working_hours_response = client.get("/api/miniapp/admin/schedule/working-hours")
+    working_hours_update_response = client.patch(
+        "/api/miniapp/admin/schedule/working-hours/1",
+        json={"is_working_day": True, "start_time": "11:00", "end_time": "17:30"},
+    )
     restrictions_response = client.get("/api/miniapp/admin/schedule/restrictions?from=2026-07-20")
     create_response = client.post(
         "/api/miniapp/admin/schedule/restrictions/closed-day",
@@ -298,8 +354,18 @@ def test_admin_schedule_settings_restrictions_and_working_hours() -> None:
 
     assert settings_response.status_code == 200
     assert settings_response.json()["timezone"] == "Europe/Moscow"
+    assert settings_update_response.status_code == 200
+    assert settings_update_response.json()["booking_horizon_days"] == 45
+    assert settings_use_cases.last_booking_horizon_days == 45
+    assert settings_use_cases.last_slot_step_minutes == 30
+    assert settings_use_cases.last_meeting_buffer_minutes == 20
     assert working_hours_response.status_code == 200
     assert working_hours_response.json()["items"][0]["weekday"] == 1
+    assert working_hours_update_response.status_code == 200
+    assert working_hours_update_response.json()["start_time"] == "11:00:00"
+    assert settings_use_cases.last_weekday == 1
+    assert settings_use_cases.last_start_time == time(11, 0)
+    assert settings_use_cases.last_end_time == time(17, 30)
     assert restrictions_response.status_code == 200
     assert restrictions_response.json()["items"][0]["restriction_type"] == "closed_day"
     assert create_response.status_code == 200
@@ -327,6 +393,18 @@ def test_admin_time_interval_rejects_invalid_range() -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "invalid_time_interval"
+
+
+def test_admin_working_hours_rejects_invalid_range() -> None:
+    client, _, _ = admin_api_client()
+
+    response = client.patch(
+        "/api/miniapp/admin/schedule/working-hours/1",
+        json={"is_working_day": True, "start_time": "18:00", "end_time": "10:00"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "invalid_working_hours"
 
 
 def test_admin_meeting_types_list_create_and_toggle() -> None:

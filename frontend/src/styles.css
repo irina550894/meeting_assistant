@@ -203,6 +203,8 @@ button:disabled {
 }
 
 .step {
+  display: grid;
+  place-items: center;
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -522,9 +524,20 @@ button:disabled {
   gap: 10px;
 }
 
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .admin-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 16px;
 }
@@ -609,15 +622,97 @@ button:disabled {
 }
 
 .admin-tile {
+  width: 100%;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: linear-gradient(135deg, rgba(217, 192, 255, 0.7), rgba(242, 208, 155, 0.45));
+  color: var(--ink);
+  text-align: left;
 }
 
 .admin-tile strong {
   display: block;
   margin-top: 5px;
+}
+
+.admin-tile-compact {
+  min-height: 76px;
+  padding: 10px;
+  border-radius: 16px;
+}
+
+.admin-tile-compact span {
+  font-size: 11px;
+}
+
+.admin-tile-compact strong {
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.admin-tile-button {
+  cursor: pointer;
+}
+
+.setting-editor {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: end;
+}
+
+.setting-editor label,
+.time-edit-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.setting-editor label span,
+.time-edit-grid label span,
+.toggle-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.setting-editor input,
+.time-edit-grid input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.working-hours-editor {
+  display: grid;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--purple);
+}
+
+.time-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.compact-primary {
+  margin-top: 0;
 }
 
 .compact-action {
@@ -742,6 +837,7 @@ button:disabled {
   }
 
   .slot-grid,
+  .admin-summary-grid,
   .action-row {
     grid-template-columns: 1fr;
   }

@@ -22,7 +22,6 @@ import {
   createBooking,
   deleteScheduleRestriction,
   loadAdminBookings,
-  loadAdminCalendar,
   loadAdminDashboard,
   loadAdminMeetingTypes,
   loadAvailableDates,
@@ -38,6 +37,8 @@ import {
   rejectAdminBooking,
   setAdminMeetingTypeActive,
   trackMiniAppEvent,
+  updateScheduleSettings,
+  updateWorkingHours,
 } from "./api";
 import { initTelegramShell, telegramApp } from "./telegram";
 import type {
@@ -51,9 +52,11 @@ import type {
   MiniAppMeetingType,
   MiniAppScheduleRestriction,
   MiniAppScheduleSettings,
+  MiniAppScheduleSettingsUpdate,
   MiniAppSlot,
   MiniAppUser,
   MiniAppWorkingHours,
+  MiniAppWorkingHoursUpdate,
 } from "./types";
 
 type TabId = "home" | "calendar" | "admin";
@@ -62,7 +65,8 @@ type DateViewMode = "month" | "time";
 type ToastTone = "success" | "error" | "info";
 type Toast = { tone: ToastTone; text: string } | null;
 type AdminStatusFilter = "" | "pending" | "confirmed" | "reschedule_requested" | "rejected";
-type AdminView = "dashboard" | "requests" | "calendar" | "schedule" | "types";
+type AdminView = "requests" | "schedule" | "types";
+type AdminScheduleSettingKey = keyof MiniAppScheduleSettingsUpdate;
 
 type BookingFormState = {
   fullName: string;
@@ -139,11 +143,10 @@ export function App() {
   const [personalDataConsentChecked, setPersonalDataConsentChecked] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [adminView, setAdminView] = useState<AdminView>("dashboard");
+  const [adminView, setAdminView] = useState<AdminView>("requests");
   const [adminStatusFilter, setAdminStatusFilter] = useState<AdminStatusFilter>("pending");
   const [adminDashboard, setAdminDashboard] = useState<MiniAppAdminDashboard | null>(null);
   const [adminBookings, setAdminBookings] = useState<MiniAppAdminBookingCard[]>([]);
-  const [adminCalendar, setAdminCalendar] = useState<MiniAppBooking[]>([]);
   const [selectedAdminCard, setSelectedAdminCard] = useState<MiniAppAdminBookingCard | null>(null);
   const [adminMeetingUrl, setAdminMeetingUrl] = useState("");
   const [adminRejectReason, setAdminRejectReason] = useState("");
@@ -371,7 +374,6 @@ export function App() {
     if (isPreview) {
       setAdminDashboard(previewAdminDashboard());
       setAdminBookings(previewAdminCards(adminStatusFilter || undefined));
-      setAdminCalendar(previewBookings().filter((booking) => booking.status === "confirmed"));
       setScheduleSettings(previewScheduleSettings());
       setWorkingHours(previewWorkingHours());
       setRestrictions(previewRestrictions());
@@ -383,7 +385,6 @@ export function App() {
       const [
         dashboard,
         cards,
-        calendar,
         settings,
         hours,
         currentRestrictions,
@@ -391,7 +392,6 @@ export function App() {
       ] = await Promise.all([
         loadAdminDashboard(),
         loadAdminBookings(adminStatusFilter || undefined),
-        loadAdminCalendar(),
         loadScheduleSettings(),
         loadWorkingHours(),
         loadScheduleRestrictions(today),
@@ -399,7 +399,6 @@ export function App() {
       ]);
       setAdminDashboard(dashboard);
       setAdminBookings(cards);
-      setAdminCalendar(calendar);
       setScheduleSettings(settings);
       setWorkingHours(hours);
       setRestrictions(currentRestrictions);
@@ -552,6 +551,46 @@ export function App() {
     }
   }
 
+  async function handleUpdateScheduleSettings(payload: MiniAppScheduleSettingsUpdate) {
+    setIsBusy(true);
+    try {
+      const updated = isPreview
+        ? {
+            ...(scheduleSettings ?? previewScheduleSettings()),
+            ...payload,
+          }
+        : await updateScheduleSettings(payload);
+      setScheduleSettings(updated);
+      showToast("success", "Настройки расписания обновлены");
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleUpdateWorkingHours(
+    weekday: number,
+    payload: MiniAppWorkingHoursUpdate,
+  ) {
+    setIsBusy(true);
+    try {
+      const updated = isPreview
+        ? { weekday, ...payload }
+        : await updateWorkingHours(weekday, payload);
+      setWorkingHours((current) =>
+        [...current.filter((item) => item.weekday !== weekday), updated].sort(
+          (left, right) => left.weekday - right.weekday,
+        ),
+      );
+      showToast("success", "Рабочие часы обновлены");
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function handleAddMeetingType() {
     const durations = newMeetingTypeDurations
       .split(",")
@@ -658,7 +697,6 @@ export function App() {
             view={adminView}
             dashboard={adminDashboard}
             cards={adminBookings}
-            calendar={adminCalendar}
             selectedCard={selectedAdminCard}
             statusFilter={adminStatusFilter}
             meetingUrl={adminMeetingUrl}
@@ -692,6 +730,8 @@ export function App() {
             onNewClosedHoursCommentChange={setNewClosedHoursComment}
             onAddClosedHours={() => void handleAddClosedHours()}
             onDeleteRestriction={(id) => void handleDeleteRestriction(id)}
+            onUpdateScheduleSettings={(payload) => void handleUpdateScheduleSettings(payload)}
+            onUpdateWorkingHours={(weekday, payload) => void handleUpdateWorkingHours(weekday, payload)}
             onNewMeetingTypeNameChange={setNewMeetingTypeName}
             onNewMeetingTypeDurationsChange={setNewMeetingTypeDurations}
             onAddMeetingType={() => void handleAddMeetingType()}
@@ -783,14 +823,12 @@ function BookingForm({
       <PanelHeader title={form.previousBookingId ? "Перенос встречи" : "Новая встреча"} action="3 шага" />
       <div className="stepper" aria-label="Шаги записи">
         {(["details", "slot", "review"] as FormStep[]).map((step, index) => (
-          <button
+          <span
             key={step}
-            type="button"
             className={formStep === step ? "step step-active" : "step"}
-            onClick={() => onStepChange(step)}
           >
             {index + 1}
-          </button>
+          </span>
         ))}
       </div>
 
@@ -1060,7 +1098,6 @@ function AdminScreen({
   view,
   dashboard,
   cards,
-  calendar,
   selectedCard,
   statusFilter,
   meetingUrl,
@@ -1094,6 +1131,8 @@ function AdminScreen({
   onNewClosedHoursCommentChange,
   onAddClosedHours,
   onDeleteRestriction,
+  onUpdateScheduleSettings,
+  onUpdateWorkingHours,
   onNewMeetingTypeNameChange,
   onNewMeetingTypeDurationsChange,
   onAddMeetingType,
@@ -1102,7 +1141,6 @@ function AdminScreen({
   view: AdminView;
   dashboard: MiniAppAdminDashboard | null;
   cards: MiniAppAdminBookingCard[];
-  calendar: MiniAppBooking[];
   selectedCard: MiniAppAdminBookingCard | null;
   statusFilter: AdminStatusFilter;
   meetingUrl: string;
@@ -1136,6 +1174,8 @@ function AdminScreen({
   onNewClosedHoursCommentChange: (value: string) => void;
   onAddClosedHours: () => void;
   onDeleteRestriction: (id: string) => void;
+  onUpdateScheduleSettings: (payload: MiniAppScheduleSettingsUpdate) => void;
+  onUpdateWorkingHours: (weekday: number, payload: MiniAppWorkingHoursUpdate) => void;
   onNewMeetingTypeNameChange: (value: string) => void;
   onNewMeetingTypeDurationsChange: (value: string) => void;
   onAddMeetingType: () => void;
@@ -1156,9 +1196,9 @@ function AdminScreen({
           </button>
         ))}
       </div>
-      {view === "dashboard" ? <AdminDashboardView dashboard={dashboard} /> : null}
       {view === "requests" ? (
         <AdminRequestsView
+          dashboard={dashboard}
           cards={cards}
           selectedCard={selectedCard}
           statusFilter={statusFilter}
@@ -1173,7 +1213,6 @@ function AdminScreen({
           onReject={onReject}
         />
       ) : null}
-      {view === "calendar" ? <AdminCalendarView bookings={calendar} /> : null}
       {view === "schedule" ? (
         <AdminScheduleView
           settings={scheduleSettings}
@@ -1195,6 +1234,8 @@ function AdminScreen({
           onNewClosedHoursCommentChange={onNewClosedHoursCommentChange}
           onAddClosedHours={onAddClosedHours}
           onDeleteRestriction={onDeleteRestriction}
+          onUpdateScheduleSettings={onUpdateScheduleSettings}
+          onUpdateWorkingHours={onUpdateWorkingHours}
         />
       ) : null}
       {view === "types" ? (
@@ -1214,40 +1255,13 @@ function AdminScreen({
 }
 
 const adminViews: { id: AdminView; label: string }[] = [
-  { id: "dashboard", label: "Сводка" },
   { id: "requests", label: "Заявки" },
-  { id: "calendar", label: "План" },
   { id: "schedule", label: "Расписание" },
   { id: "types", label: "Типы" },
 ];
 
-function AdminDashboardView({ dashboard }: { dashboard: MiniAppAdminDashboard | null }) {
-  const metrics = dashboard?.metrics;
-  return (
-    <>
-      <div className="admin-grid">
-        <AdminTile label="Ожидают" value={String(metrics?.pending ?? 0)} />
-        <AdminTile label="Подтверждены" value={String(metrics?.confirmed ?? 0)} />
-        <AdminTile label="Переносы" value={String(metrics?.reschedule_requested ?? 0)} />
-        <AdminTile label="Отменены" value={String(metrics?.cancelled ?? 0)} />
-      </div>
-      <div className="detail-panel">
-        <PanelHeader title="Ближайшие" action={`${dashboard?.upcoming.length ?? 0}`} />
-        {(dashboard?.upcoming ?? []).slice(0, 4).map((booking) => (
-          <div key={booking.id} className="booking-row">
-            <div>
-              <strong>{statusLabel(booking.status)}</strong>
-              <span>{dateTimeLabel(booking.starts_at)}</span>
-            </div>
-            <Clock3 size={18} aria-hidden="true" />
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function AdminRequestsView({
+  dashboard,
   cards,
   selectedCard,
   statusFilter,
@@ -1261,6 +1275,7 @@ function AdminRequestsView({
   onConfirm,
   onReject,
 }: {
+  dashboard: MiniAppAdminDashboard | null;
   cards: MiniAppAdminBookingCard[];
   selectedCard: MiniAppAdminBookingCard | null;
   statusFilter: AdminStatusFilter;
@@ -1274,8 +1289,15 @@ function AdminRequestsView({
   onConfirm: (card: MiniAppAdminBookingCard) => void;
   onReject: (card: MiniAppAdminBookingCard) => void;
 }) {
+  const metrics = dashboard?.metrics;
   return (
     <>
+      <div className="admin-summary-grid">
+        <AdminTile label="Ожидают" value={String(metrics?.pending ?? 0)} compact />
+        <AdminTile label="Подтверждены" value={String(metrics?.confirmed ?? 0)} compact />
+        <AdminTile label="Переносы" value={String(metrics?.reschedule_requested ?? 0)} compact />
+        <AdminTile label="Отменены" value={String(metrics?.cancelled ?? 0)} compact />
+      </div>
       <select
         className="admin-filter"
         value={statusFilter}
@@ -1363,32 +1385,6 @@ function AdminRequestsView({
   );
 }
 
-function AdminCalendarView({ bookings }: { bookings: MiniAppBooking[] }) {
-  return (
-    <>
-      <div className="calendar-card">
-        {previewDates().slice(0, 5).map((date, index) => (
-          <div key={date} className={index === 1 ? "calendar-day selected" : "calendar-day"}>
-            <span>{weekdayLabel(date)}</span>
-            <strong>{dayLabel(date)}</strong>
-          </div>
-        ))}
-      </div>
-      <div className="timeline-list compact-list">
-        {bookings.map((booking) => (
-          <div key={booking.id} className="booking-row">
-            <div>
-              <strong>{bookingNumberLabel(booking)}</strong>
-              <span>{booking.meeting_url ? "Meet ссылка есть" : "Без ссылки"}</span>
-            </div>
-            <CalendarDays size={18} aria-hidden="true" />
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
 function AdminScheduleView({
   settings,
   workingHours,
@@ -1409,6 +1405,8 @@ function AdminScheduleView({
   onNewClosedHoursCommentChange,
   onAddClosedHours,
   onDeleteRestriction,
+  onUpdateScheduleSettings,
+  onUpdateWorkingHours,
 }: {
   settings: MiniAppScheduleSettings | null;
   workingHours: MiniAppWorkingHours[];
@@ -1429,24 +1427,216 @@ function AdminScheduleView({
   onNewClosedHoursCommentChange: (value: string) => void;
   onAddClosedHours: () => void;
   onDeleteRestriction: (id: string) => void;
+  onUpdateScheduleSettings: (payload: MiniAppScheduleSettingsUpdate) => void;
+  onUpdateWorkingHours: (weekday: number, payload: MiniAppWorkingHoursUpdate) => void;
 }) {
+  const [editingSetting, setEditingSetting] = useState<AdminScheduleSettingKey | null>(null);
+  const [settingDraft, setSettingDraft] = useState("");
+  const [editingWeekday, setEditingWeekday] = useState<number | null>(null);
+  const [workingHoursDraft, setWorkingHoursDraft] = useState({
+    isWorkingDay: true,
+    startTime: "10:00",
+    endTime: "18:00",
+  });
+  const editableSettings = adminScheduleSettingOptions(settings);
+  const activeSetting = editableSettings.find((item) => item.key === editingSetting) ?? null;
+
+  function beginSettingEdit(key: AdminScheduleSettingKey) {
+    const option = editableSettings.find((item) => item.key === key);
+    if (!option) {
+      return;
+    }
+    setEditingSetting(key);
+    setSettingDraft(String(option.value));
+  }
+
+  function changeSettingDraft(delta: number) {
+    if (!activeSetting) {
+      return;
+    }
+    const currentValue = Number(settingDraft || activeSetting.value);
+    const nextValue = clampNumber(
+      currentValue + delta,
+      activeSetting.min,
+      activeSetting.max,
+    );
+    setSettingDraft(String(nextValue));
+  }
+
+  function saveSettingDraft() {
+    if (!settings || !editingSetting || !activeSetting) {
+      return;
+    }
+    const nextValue = clampNumber(
+      Number(settingDraft),
+      activeSetting.min,
+      activeSetting.max,
+    );
+    onUpdateScheduleSettings({
+      booking_horizon_days: settings.booking_horizon_days,
+      slot_step_minutes: settings.slot_step_minutes,
+      meeting_buffer_minutes: settings.meeting_buffer_minutes,
+      [editingSetting]: nextValue,
+    });
+    setEditingSetting(null);
+  }
+
+  function beginWorkingHoursEdit(row: MiniAppWorkingHours) {
+    setEditingWeekday(row.weekday);
+    setWorkingHoursDraft({
+      isWorkingDay: row.is_working_day,
+      startTime: timeInputValue(row.start_time) || "10:00",
+      endTime: timeInputValue(row.end_time) || "18:00",
+    });
+  }
+
+  function saveWorkingHoursDraft() {
+    if (editingWeekday === null) {
+      return;
+    }
+    onUpdateWorkingHours(editingWeekday, {
+      is_working_day: workingHoursDraft.isWorkingDay,
+      start_time: workingHoursDraft.isWorkingDay ? workingHoursDraft.startTime : null,
+      end_time: workingHoursDraft.isWorkingDay ? workingHoursDraft.endTime : null,
+    });
+    setEditingWeekday(null);
+  }
+
   return (
     <>
-      <div className="admin-grid">
-        <AdminTile label="Часовой пояс" value={settings?.timezone ?? "Не задан"} />
-        <AdminTile label="Горизонт" value={`${settings?.booking_horizon_days ?? 0} дней`} />
-        <AdminTile label="Шаг слота" value={`${settings?.slot_step_minutes ?? 0} мин`} />
-        <AdminTile label="Буфер" value={`${settings?.meeting_buffer_minutes ?? 0} мин`} />
+      <div className="admin-grid admin-grid-compact">
+        <AdminTile label="Часовой пояс" value={settings?.timezone ?? "Не задан"} compact />
+        {editableSettings.map((item) => (
+          <AdminTile
+            key={item.key}
+            label={item.label}
+            value={`${item.value} ${item.unit}`}
+            compact
+            onClick={() => beginSettingEdit(item.key)}
+          />
+        ))}
       </div>
+      {activeSetting ? (
+        <div className="detail-panel">
+          <PanelHeader title={activeSetting.label} action="Изменить" />
+          <div className="setting-editor">
+            <button
+              type="button"
+              className="icon-button"
+              disabled={isBusy}
+              onClick={() => changeSettingDraft(-activeSetting.step)}
+              aria-label="Уменьшить"
+            >
+              -
+            </button>
+            <label>
+              <span>{activeSetting.unit}</span>
+              <input
+                type="number"
+                min={activeSetting.min}
+                max={activeSetting.max}
+                step={activeSetting.step}
+                value={settingDraft}
+                onChange={(event) => setSettingDraft(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="icon-button"
+              disabled={isBusy}
+              onClick={() => changeSettingDraft(activeSetting.step)}
+              aria-label="Увеличить"
+            >
+              +
+            </button>
+          </div>
+          <div className="action-row">
+            <button type="button" className="secondary-button" onClick={() => setEditingSetting(null)}>
+              Отмена
+            </button>
+            <button type="button" className="primary-button compact-primary" disabled={isBusy} onClick={saveSettingDraft}>
+              Сохранить
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="detail-panel">
         <PanelHeader title="Рабочие часы" action={`${workingHours.length}`} />
         {workingHours.map((row) => (
-          <ReviewRow
+          <button
             key={row.weekday}
-            label={weekdayName(row.weekday)}
-            value={row.is_working_day ? `${row.start_time} - ${row.end_time}` : "Выходной"}
-          />
+            type="button"
+            className="booking-row booking-row-button"
+            onClick={() => beginWorkingHoursEdit(row)}
+          >
+            <div>
+              <strong>{weekdayName(row.weekday)}</strong>
+              <span>{workingHoursLabel(row)}</span>
+            </div>
+            <span>Изменить</span>
+          </button>
         ))}
+        {editingWeekday !== null ? (
+          <div className="working-hours-editor">
+            <PanelHeader title={weekdayName(editingWeekday)} action="Рабочие часы" />
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={workingHoursDraft.isWorkingDay}
+                onChange={(event) =>
+                  setWorkingHoursDraft((current) => ({
+                    ...current,
+                    isWorkingDay: event.target.checked,
+                  }))
+                }
+              />
+              <span>Рабочий день</span>
+            </label>
+            {workingHoursDraft.isWorkingDay ? (
+              <div className="time-edit-grid">
+                <label>
+                  <span>Начало</span>
+                  <input
+                    type="time"
+                    value={workingHoursDraft.startTime}
+                    onChange={(event) =>
+                      setWorkingHoursDraft((current) => ({
+                        ...current,
+                        startTime: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Конец</span>
+                  <input
+                    type="time"
+                    value={workingHoursDraft.endTime}
+                    onChange={(event) =>
+                      setWorkingHoursDraft((current) => ({
+                        ...current,
+                        endTime: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            ) : null}
+            <div className="action-row">
+              <button type="button" className="secondary-button" onClick={() => setEditingWeekday(null)}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="primary-button compact-primary"
+                disabled={isBusy}
+                onClick={saveWorkingHoursDraft}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <div className="detail-panel">
         <PanelHeader title="Закрытый день" action="Добавить" />
@@ -1687,9 +1877,28 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function AdminTile({ label, value }: { label: string; value: string }) {
+function AdminTile({
+  label,
+  value,
+  compact = false,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+  onClick?: () => void;
+}) {
+  const className = compact ? "admin-tile admin-tile-compact" : "admin-tile";
+  if (onClick) {
+    return (
+      <button type="button" className={`${className} admin-tile-button`} onClick={onClick}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </button>
+    );
+  }
   return (
-    <div className="admin-tile">
+    <div className={className}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -1894,6 +2103,64 @@ function dayLabel(value: string): string {
 function weekdayName(weekday: number): string {
   const labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   return labels[weekday] ?? String(weekday);
+}
+
+function adminScheduleSettingOptions(settings: MiniAppScheduleSettings | null): Array<{
+  key: AdminScheduleSettingKey;
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+}> {
+  return [
+    {
+      key: "booking_horizon_days",
+      label: "Горизонт",
+      unit: "дней",
+      value: settings?.booking_horizon_days ?? 0,
+      min: 1,
+      max: 365,
+      step: 1,
+    },
+    {
+      key: "slot_step_minutes",
+      label: "Шаг слота",
+      unit: "мин",
+      value: settings?.slot_step_minutes ?? 0,
+      min: 5,
+      max: 240,
+      step: 5,
+    },
+    {
+      key: "meeting_buffer_minutes",
+      label: "Буфер",
+      unit: "мин",
+      value: settings?.meeting_buffer_minutes ?? 0,
+      min: 0,
+      max: 240,
+      step: 5,
+    },
+  ];
+}
+
+function workingHoursLabel(row: MiniAppWorkingHours): string {
+  if (!row.is_working_day) {
+    return "Выходной";
+  }
+  return `${timeInputValue(row.start_time)} - ${timeInputValue(row.end_time)}`;
+}
+
+function timeInputValue(value: string | null): string {
+  return value ? value.slice(0, 5) : "";
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
 }
 
 function errorText(error: unknown): string {

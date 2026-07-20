@@ -37,9 +37,11 @@ from app.interfaces.http.schemas.miniapp import (
     MiniAppScheduleRestrictionResponse,
     MiniAppScheduleRestrictionsResponse,
     MiniAppScheduleSettingsResponse,
+    MiniAppScheduleSettingsUpdateRequest,
     MiniAppTimeIntervalRestrictionCreateRequest,
     MiniAppWorkingHoursListResponse,
     MiniAppWorkingHoursResponse,
+    MiniAppWorkingHoursUpdateRequest,
 )
 from app.settings.config import get_settings
 
@@ -170,6 +172,30 @@ async def mini_app_admin_schedule_settings(
     )
 
 
+@router.patch("/schedule/settings", response_model=MiniAppScheduleSettingsResponse)
+async def mini_app_admin_update_schedule_settings(
+    payload: MiniAppScheduleSettingsUpdateRequest,
+    admin: Annotated[UserProfile, Depends(get_current_mini_app_admin)],
+    use_cases: Annotated[AdminSettingsUseCases, Depends(get_admin_settings_use_cases)],
+) -> MiniAppScheduleSettingsResponse:
+    del admin
+    try:
+        settings = await use_cases.update_schedule_settings(
+            booking_horizon_days=payload.booking_horizon_days,
+            slot_step_minutes=payload.slot_step_minutes,
+            meeting_buffer_minutes=payload.meeting_buffer_minutes,
+        )
+    except AdminSettingsUseCaseError as error:
+        raise _settings_http_error(error) from error
+    return MiniAppScheduleSettingsResponse(
+        timezone=settings.timezone,
+        min_booking_lead_days=settings.min_booking_lead_days,
+        booking_horizon_days=settings.booking_horizon_days,
+        slot_step_minutes=settings.slot_step_minutes,
+        meeting_buffer_minutes=settings.meeting_buffer_minutes,
+    )
+
+
 @router.get("/schedule/working-hours", response_model=MiniAppWorkingHoursListResponse)
 async def mini_app_admin_working_hours(
     admin: Annotated[UserProfile, Depends(get_current_mini_app_admin)],
@@ -187,6 +213,31 @@ async def mini_app_admin_working_hours(
             )
             for row in rows
         ]
+    )
+
+
+@router.patch("/schedule/working-hours/{weekday}", response_model=MiniAppWorkingHoursResponse)
+async def mini_app_admin_update_working_hours(
+    weekday: int,
+    payload: MiniAppWorkingHoursUpdateRequest,
+    admin: Annotated[UserProfile, Depends(get_current_mini_app_admin)],
+    use_cases: Annotated[AdminSettingsUseCases, Depends(get_admin_settings_use_cases)],
+) -> MiniAppWorkingHoursResponse:
+    del admin
+    try:
+        row = await use_cases.update_working_hours(
+            weekday=weekday,
+            is_working_day=payload.is_working_day,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+        )
+    except AdminSettingsUseCaseError as error:
+        raise _settings_http_error(error) from error
+    return MiniAppWorkingHoursResponse(
+        weekday=row.weekday,
+        is_working_day=row.is_working_day,
+        start_time=row.start_time,
+        end_time=row.end_time,
     )
 
 

@@ -147,7 +147,24 @@ class AdminMeetingType:
 class AdminSettingsStore(Protocol):
     async def get_schedule_settings(self) -> AdminScheduleSettings: ...
 
+    async def update_schedule_settings(
+        self,
+        *,
+        booking_horizon_days: int,
+        slot_step_minutes: int,
+        meeting_buffer_minutes: int,
+    ) -> AdminScheduleSettings: ...
+
     async def list_working_hours(self) -> list[AdminWorkingHoursRule]: ...
+
+    async def update_working_hours(
+        self,
+        *,
+        weekday: int,
+        is_working_day: bool,
+        start_time: time | None,
+        end_time: time | None,
+    ) -> AdminWorkingHoursRule: ...
 
     async def list_upcoming_restrictions(
         self,

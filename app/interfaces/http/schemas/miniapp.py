@@ -150,11 +150,23 @@ class MiniAppScheduleSettingsResponse(BaseModel):
     meeting_buffer_minutes: int
 
 
+class MiniAppScheduleSettingsUpdateRequest(BaseModel):
+    booking_horizon_days: int
+    slot_step_minutes: int
+    meeting_buffer_minutes: int
+
+
 class MiniAppWorkingHoursResponse(BaseModel):
     weekday: int
     is_working_day: bool
     start_time: time | None
     end_time: time | None
+
+
+class MiniAppWorkingHoursUpdateRequest(BaseModel):
+    is_working_day: bool
+    start_time: time | None = None
+    end_time: time | None = None
 
 
 class MiniAppWorkingHoursListResponse(BaseModel):

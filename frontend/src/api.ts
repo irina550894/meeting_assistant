@@ -8,9 +8,11 @@ import type {
   MiniAppMeetingType,
   MiniAppScheduleRestriction,
   MiniAppScheduleSettings,
+  MiniAppScheduleSettingsUpdate,
   MiniAppSlot,
   MiniAppUser,
   MiniAppWorkingHours,
+  MiniAppWorkingHoursUpdate,
 } from "./types";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -161,17 +163,32 @@ export async function rejectAdminBooking(
   });
 }
 
-export async function loadAdminCalendar(): Promise<MiniAppBooking[]> {
-  return request<MiniAppBooking[]>("/api/miniapp/admin/calendar");
-}
-
 export async function loadScheduleSettings(): Promise<MiniAppScheduleSettings> {
   return request<MiniAppScheduleSettings>("/api/miniapp/admin/schedule/settings");
+}
+
+export async function updateScheduleSettings(
+  payload: MiniAppScheduleSettingsUpdate,
+): Promise<MiniAppScheduleSettings> {
+  return request<MiniAppScheduleSettings>("/api/miniapp/admin/schedule/settings", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function loadWorkingHours(): Promise<MiniAppWorkingHours[]> {
   const response = await request<WorkingHoursResponse>("/api/miniapp/admin/schedule/working-hours");
   return response.items;
+}
+
+export async function updateWorkingHours(
+  weekday: number,
+  payload: MiniAppWorkingHoursUpdate,
+): Promise<MiniAppWorkingHours> {
+  return request<MiniAppWorkingHours>(`/api/miniapp/admin/schedule/working-hours/${weekday}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function loadScheduleRestrictions(fromDate: string): Promise<MiniAppScheduleRestriction[]> {

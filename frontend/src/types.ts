@@ -52,8 +52,20 @@ export type MiniAppScheduleSettings = {
   meeting_buffer_minutes: number;
 };
 
+export type MiniAppScheduleSettingsUpdate = {
+  booking_horizon_days: number;
+  slot_step_minutes: number;
+  meeting_buffer_minutes: number;
+};
+
 export type MiniAppWorkingHours = {
   weekday: number;
+  is_working_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
+};
+
+export type MiniAppWorkingHoursUpdate = {
   is_working_day: boolean;
   start_time: string | null;
   end_time: string | null;

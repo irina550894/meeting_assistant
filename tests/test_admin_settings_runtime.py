@@ -67,6 +67,30 @@ async def test_in_memory_admin_settings_manage_restrictions_and_meeting_types() 
     assert added.allowed_durations_minutes == (60, 90)
 
 
+async def test_in_memory_admin_settings_update_schedule_and_working_hours() -> None:
+    store = InMemoryRuntimeStore(Settings())
+
+    settings = await store.update_schedule_settings(
+        booking_horizon_days=45,
+        slot_step_minutes=30,
+        meeting_buffer_minutes=20,
+    )
+    working_hours = await store.update_working_hours(
+        weekday=0,
+        is_working_day=True,
+        start_time=time(11, 0),
+        end_time=time(17, 30),
+    )
+    context = await store.context_for_date(date(2026, 7, 13))
+
+    assert settings.booking_horizon_days == 45
+    assert settings.slot_step_minutes == 30
+    assert settings.meeting_buffer_minutes == 20
+    assert working_hours.start_time == time(11, 0)
+    assert context.settings.booking_horizon_days == 45
+    assert context.working_hours[0].start_time == time(11, 0)
+
+
 def test_admin_meeting_type_durations_parser() -> None:
     assert _parse_meeting_type_durations("90, 30, 60, 60") == (30, 60, 90)
     assert _parse_meeting_type_durations("120") is None
