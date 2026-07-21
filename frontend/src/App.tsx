@@ -2504,7 +2504,7 @@ function canCancelBooking(booking: MiniAppBooking): boolean {
 }
 
 function isArchivedBooking(booking: MiniAppBooking): boolean {
-  if (booking.status === "rejected") {
+  if (["cancelled_by_user", "rejected"].includes(booking.status)) {
     return true;
   }
   return new Date(booking.starts_at).getTime() < Date.now();
