@@ -194,4 +194,4 @@ async def _google_calendar_runtime_for_http(settings):
         from app.integrations.google_calendar import GoogleCalendarClient
 
         return GoogleCalendarClient(settings=settings, token_provider=lambda: tokens)
-    return _google_calendar_runtime(settings)
+    return await _google_calendar_runtime(settings)

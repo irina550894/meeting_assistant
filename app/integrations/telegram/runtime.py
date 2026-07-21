@@ -37,6 +37,7 @@ from app.logging.config import configure_logging, get_logger
 from app.persistence.database import AsyncSessionFactory
 from app.persistence.repositories import (
     CommittedBackgroundJobScheduler,
+    SqlAlchemyGoogleOAuthTokenStore,
     SqlAlchemyTelegramRuntimeStore,
 )
 from app.settings.config import get_settings
@@ -90,7 +91,7 @@ async def build_telegram_runtime(settings) -> TelegramRuntime:
     def clock() -> datetime:
         return datetime.now(tz=timezone)
 
-    google_calendar = _google_calendar_runtime(settings)
+    google_calendar = await _google_calendar_runtime(settings)
     schedule_provider = (
         GoogleCalendarScheduleProvider(base=store, client=google_calendar)
         if google_calendar
@@ -178,7 +179,14 @@ async def run_local_polling() -> None:
         await runtime.bot.session.close()
 
 
-def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:
+async def _google_calendar_runtime(settings) -> GoogleCalendarClient | None:
+    stored_tokens = await SqlAlchemyGoogleOAuthTokenStore(
+        session_factory=AsyncSessionFactory,
+        settings=settings,
+    ).get()
+    if stored_tokens is not None:
+        return GoogleCalendarClient(settings=settings, token_provider=lambda: stored_tokens)
+
     if not (
         settings.google_oauth_client_id
         and settings.google_oauth_client_secret
