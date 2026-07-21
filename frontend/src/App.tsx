@@ -64,7 +64,7 @@ type FormStep = "details" | "slot" | "review";
 type DateViewMode = "month" | "time";
 type ToastTone = "success" | "error" | "info";
 type Toast = { tone: ToastTone; text: string } | null;
-type AdminStatusFilter = "" | "pending" | "confirmed" | "reschedule_requested" | "rejected";
+type AdminStatusFilter = "" | "pending" | "confirmed" | "reschedule_requested" | "cancelled_by_user" | "rejected";
 type AdminView = "requests" | "schedule" | "types";
 type AdminScheduleSettingKey = keyof MiniAppScheduleSettingsUpdate;
 
@@ -1426,6 +1426,62 @@ function AdminRequestsView({
   onReject: (card: MiniAppAdminBookingCard) => void;
 }) {
   const metrics = dashboard?.metrics;
+  const sortedCards = cards.slice().sort((left, right) => {
+    const leftValue = left.booking.created_at ?? left.booking.starts_at;
+    const rightValue = right.booking.created_at ?? right.booking.starts_at;
+    return rightValue.localeCompare(leftValue);
+  });
+  const currentCards = sortedCards.filter((card) => !isArchivedBooking(card.booking));
+  const archivedCards = sortedCards.filter((card) => isArchivedBooking(card.booking));
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+
+  useEffect(() => {
+    if (!selectedCard) {
+      return;
+    }
+    if (!cards.some((card) => card.booking.id === selectedCard.booking.id)) {
+      onSelectCard(null);
+    }
+  }, [cards, onSelectCard, selectedCard]);
+
+  function handleStatusFilterChange(nextStatus: AdminStatusFilter) {
+    onSelectCard(null);
+    setIsArchiveOpen(false);
+    onStatusFilterChange(nextStatus);
+  }
+
+  function renderAdminCard(card: MiniAppAdminBookingCard) {
+    const isSelected = selectedCard?.booking.id === card.booking.id;
+    return (
+      <Fragment key={card.booking.id}>
+        <div className="booking-row booking-row-expandable">
+          <AdminBookingSummary card={card} />
+          <div className="booking-row-actions">
+            <button
+              type="button"
+              className="booking-row-action-button"
+              onClick={() => onSelectCard(isSelected ? null : card)}
+            >
+              {isSelected ? "Скрыть" : "Открыть"}
+            </button>
+          </div>
+        </div>
+        {isSelected ? (
+          <AdminBookingDetail
+            card={card}
+            meetingUrl={meetingUrl}
+            rejectReason={rejectReason}
+            isBusy={isBusy}
+            onMeetingUrlChange={onMeetingUrlChange}
+            onRejectReasonChange={onRejectReasonChange}
+            onConfirm={onConfirm}
+            onReject={onReject}
+          />
+        ) : null}
+      </Fragment>
+    );
+  }
+
   return (
     <>
       <div className="admin-summary-grid">
@@ -1437,90 +1493,142 @@ function AdminRequestsView({
       <select
         className="admin-filter"
         value={statusFilter}
-        onChange={(event) => onStatusFilterChange(event.target.value as AdminStatusFilter)}
+        onChange={(event) => handleStatusFilterChange(event.target.value as AdminStatusFilter)}
       >
         <option value="">Все</option>
         <option value="pending">Ожидают</option>
         <option value="confirmed">Подтверждены</option>
         <option value="reschedule_requested">Переносы</option>
+        <option value="cancelled_by_user">Отменены</option>
         <option value="rejected">Отклонены</option>
       </select>
       <div className="timeline-list">
-        {cards.map((card) => (
-          <button
-            key={card.booking.id}
-            type="button"
-            className="booking-row booking-row-button"
-            onClick={() => onSelectCard(card)}
-          >
-            <div>
-              <strong>{bookingNumberLabel(card.booking)}</strong>
-              <span>
-                {card.user.full_name || card.user.telegram_username || "Пользователь"} ·{" "}
-                {dateTimeLabel(card.booking.starts_at)}
-              </span>
-            </div>
-            <span>{card.meeting_type.name}</span>
-          </button>
-        ))}
+        {currentCards.length ? (
+          currentCards.map(renderAdminCard)
+        ) : (
+          <p className="panel-copy">В выбранном списке нет активных заявок.</p>
+        )}
       </div>
-      {selectedCard ? (
-        <div className="detail-panel">
-          <PanelHeader
-            title={`Заявка ${bookingNumberLabel(selectedCard.booking)}`}
-            action={statusLabel(selectedCard.booking.status)}
-          />
-          <ReviewRow label="Клиент" value={selectedCard.user.full_name || "Без имени"} />
-          <ReviewRow label="Email" value={selectedCard.user.email || "Не указан"} />
-          <ReviewRow label="Тип" value={selectedCard.meeting_type.name} />
-          <ReviewRow label="Время" value={dateTimeLabel(selectedCard.booking.starts_at)} />
-          <ReviewRow label="Комментарий" value={selectedCard.booking.user_comment || "Без комментария"} />
-          {selectedCard.booking.status === "confirmed" && selectedCard.booking.meeting_url ? (
-            <MeetingLink href={selectedCard.booking.meeting_url} />
-          ) : null}
-          {selectedCard.booking.status === "pending" ? (
-            <>
-              <label className="wide-field">
-                <span>Ссылка на встречу</span>
-                <input
-                  value={meetingUrl}
-                  onChange={(event) => onMeetingUrlChange(event.target.value)}
-                  placeholder="Можно оставить пустым, если задан DEFAULT_MEETING_URL"
-                />
-              </label>
-              <label className="wide-field">
-                <span>Причина отклонения</span>
-                <textarea
-                  value={rejectReason}
-                  onChange={(event) => onRejectReasonChange(event.target.value)}
-                  placeholder="Можно оставить пустым"
-                />
-              </label>
-              <div className="action-row">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={isBusy}
-                  onClick={() => onConfirm(selectedCard)}
-                >
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  Подтвердить
-                </button>
-                <button
-                  type="button"
-                  className="danger-button"
-                  disabled={isBusy}
-                  onClick={() => onReject(selectedCard)}
-                >
-                  <XCircle size={18} aria-hidden="true" />
-                  Отклонить
-                </button>
-              </div>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <section className="archive-panel">
+        <button
+          type="button"
+          className="archive-toggle"
+          onClick={() => setIsArchiveOpen((current) => !current)}
+          aria-expanded={isArchiveOpen}
+        >
+          <span>Архив</span>
+          <strong>{archivedCards.length}</strong>
+        </button>
+        {isArchiveOpen ? (
+          <div className="timeline-list archive-list">
+            {archivedCards.length ? (
+              archivedCards.map(renderAdminCard)
+            ) : (
+              <p className="panel-copy">В архиве пока нет заявок.</p>
+            )}
+          </div>
+        ) : null}
+      </section>
     </>
+  );
+}
+
+function AdminBookingSummary({ card }: { card: MiniAppAdminBookingCard }) {
+  return (
+    <div>
+      <strong>{bookingNumberLabel(card.booking)}</strong>
+      <span>Клиент: {card.user.full_name || card.user.telegram_username || "Пользователь"}</span>
+      <span>Тип: {card.meeting_type.name}</span>
+      <span>Дата: {dateLabel(card.booking.starts_at)}</span>
+      <span>Время: {timeLabel(card.booking.starts_at)}</span>
+      <span>Статус: {statusLabel(card.booking.status)}</span>
+    </div>
+  );
+}
+
+function AdminBookingDetail({
+  card,
+  meetingUrl,
+  rejectReason,
+  isBusy,
+  onMeetingUrlChange,
+  onRejectReasonChange,
+  onConfirm,
+  onReject,
+}: {
+  card: MiniAppAdminBookingCard;
+  meetingUrl: string;
+  rejectReason: string;
+  isBusy: boolean;
+  onMeetingUrlChange: (value: string) => void;
+  onRejectReasonChange: (value: string) => void;
+  onConfirm: (card: MiniAppAdminBookingCard) => void;
+  onReject: (card: MiniAppAdminBookingCard) => void;
+}) {
+  return (
+    <div className="detail-panel booking-inline-detail">
+      <PanelHeader
+        title={`Заявка ${bookingNumberLabel(card.booking)}`}
+        action={statusLabel(card.booking.status)}
+      />
+      <ReviewRow label="Клиент" value={card.user.full_name || "Без имени"} />
+      <ReviewRow label="Email" value={card.user.email || "Не указан"} />
+      <ReviewRow label="Тип" value={card.meeting_type.name} />
+      <ReviewRow label="Дата" value={dateLabel(card.booking.starts_at)} />
+      <ReviewRow label="Время" value={timeLabel(card.booking.starts_at)} />
+      <ReviewRow label="Длительность" value={`${card.booking.duration_minutes} минут`} />
+      <ReviewRow label="Статус" value={statusLabel(card.booking.status)} />
+      <ReviewRow label="Комментарий" value={card.booking.user_comment || "Без комментария"} />
+      {card.booking.rejection_reason ? (
+        <ReviewRow label="Причина отклонения" value={card.booking.rejection_reason} />
+      ) : null}
+      {card.booking.cancellation_reason ? (
+        <ReviewRow label="Причина отмены" value={card.booking.cancellation_reason} />
+      ) : null}
+      {card.booking.status === "confirmed" && card.booking.meeting_url ? (
+        <MeetingLink href={card.booking.meeting_url} />
+      ) : null}
+      {card.booking.status === "pending" ? (
+        <>
+          <label className="wide-field">
+            <span>Ссылка на встречу</span>
+            <input
+              value={meetingUrl}
+              onChange={(event) => onMeetingUrlChange(event.target.value)}
+              placeholder="Можно оставить пустым, если задан DEFAULT_MEETING_URL"
+            />
+          </label>
+          <label className="wide-field">
+            <span>Причина отклонения</span>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => onRejectReasonChange(event.target.value)}
+              placeholder="Можно оставить пустым"
+            />
+          </label>
+          <div className="action-row">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={isBusy}
+              onClick={() => onConfirm(card)}
+            >
+              <CheckCircle2 size={18} aria-hidden="true" />
+              Подтвердить
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              disabled={isBusy}
+              onClick={() => onReject(card)}
+            >
+              <XCircle size={18} aria-hidden="true" />
+              Отклонить
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }
 

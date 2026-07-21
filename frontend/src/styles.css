@@ -93,17 +93,19 @@ button:disabled {
 }
 
 .top-panel h1 {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.12;
+  margin: 0 0 8px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .top-panel p {
-  max-width: 440px;
-  margin: 8px 0 0;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: 23px;
-  font-weight: 900;
+  max-width: 470px;
+  margin: 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -863,8 +865,8 @@ button:disabled {
 .nav-item span {
   max-width: 100%;
   overflow: hidden;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 13.2px;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -922,11 +924,11 @@ button:disabled {
   }
 
   .top-panel h1 {
-    font-size: 14px;
+    font-size: 20px;
   }
 
   .top-panel p {
-    font-size: 21px;
+    font-size: 20px;
   }
 
   .date-strip {
