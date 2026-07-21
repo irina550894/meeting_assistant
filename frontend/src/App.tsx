@@ -27,6 +27,7 @@ import {
   loadAvailableDates,
   loadBookings,
   loadConfig,
+  loadGoogleOAuthStatus,
   loadMeetingTypes,
   loadProfile,
   loadScheduleRestrictions,
@@ -36,11 +37,13 @@ import {
   miniAppAuth,
   rejectAdminBooking,
   setAdminMeetingTypeActive,
+  startGoogleOAuth,
   trackMiniAppEvent,
   updateScheduleSettings,
   updateWorkingHours,
 } from "./api";
 import { initTelegramShell, telegramApp } from "./telegram";
+import type { ReactNode } from "react";
 import type {
   AuthState,
   BookingCreatePayload,
@@ -49,6 +52,7 @@ import type {
   MiniAppAdminMeetingType,
   MiniAppBooking,
   MiniAppConfig,
+  MiniAppGoogleOAuthStatus,
   MiniAppMeetingType,
   MiniAppScheduleRestriction,
   MiniAppScheduleSettings,
@@ -161,6 +165,7 @@ export function App() {
   const [newClosedHoursEnd, setNewClosedHoursEnd] = useState("");
   const [newClosedHoursComment, setNewClosedHoursComment] = useState("");
   const [adminMeetingTypes, setAdminMeetingTypes] = useState<MiniAppAdminMeetingType[]>([]);
+  const [googleOAuthStatus, setGoogleOAuthStatus] = useState<MiniAppGoogleOAuthStatus | null>(null);
   const [newMeetingTypeName, setNewMeetingTypeName] = useState("");
   const [newMeetingTypeDurations, setNewMeetingTypeDurations] = useState("60");
 
@@ -432,6 +437,7 @@ export function App() {
       setWorkingHours(previewWorkingHours());
       setRestrictions(previewRestrictions());
       setAdminMeetingTypes(previewAdminMeetingTypes());
+      setGoogleOAuthStatus({ connected: false, needs_reconnect: true, error_code: "preview" });
       return;
     }
     try {
@@ -443,6 +449,7 @@ export function App() {
         hours,
         currentRestrictions,
         types,
+        oauthStatus,
       ] = await Promise.all([
         loadAdminDashboard(),
         loadAdminBookings(adminStatusFilter || undefined),
@@ -450,6 +457,11 @@ export function App() {
         loadWorkingHours(),
         loadScheduleRestrictions(today),
         loadAdminMeetingTypes(),
+        loadGoogleOAuthStatus().catch(() => ({
+          connected: false,
+          needs_reconnect: true,
+          error_code: "google_oauth_status_unavailable",
+        })),
       ]);
       setAdminDashboard(dashboard);
       setAdminBookings(cards);
@@ -457,8 +469,30 @@ export function App() {
       setWorkingHours(hours);
       setRestrictions(currentRestrictions);
       setAdminMeetingTypes(types);
+      setGoogleOAuthStatus(oauthStatus);
     } catch (error) {
       showToast("error", errorText(error));
+    }
+  }
+
+  async function handleGoogleOAuthClick() {
+    if (googleOAuthStatus?.connected && !googleOAuthStatus.needs_reconnect) {
+      showToast("success", "Google Calendar подключен");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      const authorizationUrl = await startGoogleOAuth();
+      const app = telegramApp();
+      if (app?.openLink) {
+        app.openLink(authorizationUrl);
+      } else {
+        window.location.href = authorizationUrl;
+      }
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -765,6 +799,7 @@ export function App() {
             newClosedHoursEnd={newClosedHoursEnd}
             newClosedHoursComment={newClosedHoursComment}
             meetingTypes={adminMeetingTypes}
+            googleOAuthStatus={googleOAuthStatus}
             newMeetingTypeName={newMeetingTypeName}
             newMeetingTypeDurations={newMeetingTypeDurations}
             isBusy={isBusy}
@@ -790,6 +825,7 @@ export function App() {
             onNewMeetingTypeDurationsChange={setNewMeetingTypeDurations}
             onAddMeetingType={() => void handleAddMeetingType()}
             onToggleMeetingType={(type) => void handleToggleMeetingType(type)}
+            onGoogleOAuthClick={() => void handleGoogleOAuthClick()}
           />
         ) : null}
       </section>
@@ -1248,6 +1284,7 @@ function AdminScreen({
   newClosedHoursEnd,
   newClosedHoursComment,
   meetingTypes,
+  googleOAuthStatus,
   newMeetingTypeName,
   newMeetingTypeDurations,
   isBusy,
@@ -1273,6 +1310,7 @@ function AdminScreen({
   onNewMeetingTypeDurationsChange,
   onAddMeetingType,
   onToggleMeetingType,
+  onGoogleOAuthClick,
 }: {
   view: AdminView;
   dashboard: MiniAppAdminDashboard | null;
@@ -1291,6 +1329,7 @@ function AdminScreen({
   newClosedHoursEnd: string;
   newClosedHoursComment: string;
   meetingTypes: MiniAppAdminMeetingType[];
+  googleOAuthStatus: MiniAppGoogleOAuthStatus | null;
   newMeetingTypeName: string;
   newMeetingTypeDurations: string;
   isBusy: boolean;
@@ -1316,10 +1355,20 @@ function AdminScreen({
   onNewMeetingTypeDurationsChange: (value: string) => void;
   onAddMeetingType: () => void;
   onToggleMeetingType: (type: MiniAppAdminMeetingType) => void;
+  onGoogleOAuthClick: () => void;
 }) {
   return (
     <>
-      <PanelHeader title="Админ" action="Mini App" />
+      <PanelHeader
+        title="Админ"
+        action={
+          <AdminHeaderActions
+            googleOAuthStatus={googleOAuthStatus}
+            isBusy={isBusy}
+            onGoogleOAuthClick={onGoogleOAuthClick}
+          />
+        }
+      />
       <div className="admin-tabs">
         {adminViews.map((item) => (
           <button
@@ -1395,6 +1444,40 @@ const adminViews: { id: AdminView; label: string }[] = [
   { id: "schedule", label: "Расписание" },
   { id: "types", label: "Типы" },
 ];
+
+function AdminHeaderActions({
+  googleOAuthStatus,
+  isBusy,
+  onGoogleOAuthClick,
+}: {
+  googleOAuthStatus: MiniAppGoogleOAuthStatus | null;
+  isBusy: boolean;
+  onGoogleOAuthClick: () => void;
+}) {
+  const isConnected = Boolean(googleOAuthStatus?.connected && !googleOAuthStatus.needs_reconnect);
+  return (
+    <div className="admin-header-actions">
+      <button
+        type="button"
+        className="panel-badge oauth-badge-button"
+        onClick={onGoogleOAuthClick}
+        disabled={isBusy}
+        title={isConnected ? "Google Calendar подключен" : "Нужно подтвердить Google Calendar"}
+      >
+        OAuth
+        <span
+          className={
+            isConnected ? "oauth-status oauth-status-connected" : "oauth-status oauth-status-error"
+          }
+          aria-hidden="true"
+        >
+          V
+        </span>
+      </button>
+      <span className="panel-badge">Mini App</span>
+    </div>
+  );
+}
 
 function AdminRequestsView({
   dashboard,
@@ -2108,11 +2191,13 @@ function BottomNav({
   );
 }
 
-function PanelHeader({ title, action }: { title: string; action: string }) {
+function PanelHeader({ title, action }: { title: string; action: ReactNode }) {
   return (
     <div className="panel-header">
       <h2>{title}</h2>
-      <span>{action}</span>
+      <div className="panel-header-action">
+        {typeof action === "string" ? <span className="panel-badge">{action}</span> : action}
+      </div>
     </div>
   );
 }

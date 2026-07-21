@@ -5,6 +5,7 @@ import type {
   MiniAppAdminMeetingType,
   MiniAppBooking,
   MiniAppConfig,
+  MiniAppGoogleOAuthStatus,
   MiniAppMeetingType,
   MiniAppScheduleRestriction,
   MiniAppScheduleSettings,
@@ -56,6 +57,10 @@ type WorkingHoursResponse = {
 
 type RestrictionsResponse = {
   items: MiniAppScheduleRestriction[];
+};
+
+type GoogleOAuthStartResponse = {
+  authorization_url: string;
 };
 
 export async function miniAppAuth(initData: string): Promise<AuthResponse> {
@@ -235,6 +240,15 @@ export async function deleteScheduleRestriction(restrictionId: string): Promise<
 export async function loadAdminMeetingTypes(): Promise<MiniAppAdminMeetingType[]> {
   const response = await request<AdminMeetingTypesResponse>("/api/miniapp/admin/meeting-types");
   return response.items;
+}
+
+export async function loadGoogleOAuthStatus(): Promise<MiniAppGoogleOAuthStatus> {
+  return request<MiniAppGoogleOAuthStatus>("/oauth/google/status");
+}
+
+export async function startGoogleOAuth(): Promise<string> {
+  const response = await request<GoogleOAuthStartResponse>("/oauth/google/start");
+  return response.authorization_url;
 }
 
 export async function addAdminMeetingType(payload: {

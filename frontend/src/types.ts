@@ -80,6 +80,12 @@ export type MiniAppScheduleRestriction = {
   admin_comment: string | null;
 };
 
+export type MiniAppGoogleOAuthStatus = {
+  connected: boolean;
+  needs_reconnect: boolean;
+  error_code: string | null;
+};
+
 export type MiniAppSlot = {
   starts_at: string;
   ends_at: string;

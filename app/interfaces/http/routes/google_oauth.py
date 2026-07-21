@@ -1,8 +1,14 @@
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import SecretStr
 
 from app.integrations.google_calendar import (
+    GoogleCalendarClient,
     GoogleCalendarError,
     GoogleOAuthService,
+    GoogleOAuthTokens,
 )
 from app.logging.config import get_logger
 from app.persistence.database import AsyncSessionFactory
@@ -13,6 +19,48 @@ router = APIRouter(prefix="/oauth/google", tags=["google-oauth"])
 logger = get_logger(__name__)
 
 _last_state: str | None = None
+
+
+@router.get("/status")
+async def google_oauth_status() -> dict[str, bool | str | None]:
+    settings = get_settings()
+    tokens = await SqlAlchemyGoogleOAuthTokenStore(
+        session_factory=AsyncSessionFactory,
+        settings=settings,
+    ).get()
+
+    if tokens is None and (
+        settings.google_oauth_client_id
+        and settings.google_oauth_client_secret
+        and settings.google_oauth_refresh_token
+    ):
+        tokens = GoogleOAuthTokens(
+            access_token=None,
+            refresh_token=settings.google_oauth_refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.google_oauth_client_id,
+            client_secret=SecretStr(settings.google_oauth_client_secret.get_secret_value()),
+        )
+
+    if tokens is None:
+        return {
+            "connected": False,
+            "needs_reconnect": True,
+            "error_code": "google_calendar_not_connected",
+        }
+
+    client = GoogleCalendarClient(settings=settings, token_provider=lambda: tokens)
+    now = datetime.now(ZoneInfo(settings.app_timezone))
+    try:
+        client.list_busy_intervals(time_min=now, time_max=now + timedelta(minutes=1))
+    except GoogleCalendarError as error:
+        return {
+            "connected": False,
+            "needs_reconnect": True,
+            "error_code": error.code,
+        }
+
+    return {"connected": True, "needs_reconnect": False, "error_code": None}
 
 
 @router.get("/start")

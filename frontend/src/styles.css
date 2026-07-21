@@ -151,13 +151,47 @@ button:disabled {
   line-height: 1.2;
 }
 
-.panel-header span {
+.panel-header-action,
+.admin-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.panel-badge {
   padding: 7px 10px;
   border-radius: 999px;
   background: rgba(217, 192, 255, 0.55);
   color: var(--purple);
   font-size: 12px;
   font-weight: 800;
+}
+
+.oauth-badge-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.oauth-badge-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.oauth-status {
+  font-weight: 900;
+}
+
+.oauth-status-connected {
+  color: #168a3d;
+}
+
+.oauth-status-error {
+  color: #dc2626;
 }
 
 .primary-button {
