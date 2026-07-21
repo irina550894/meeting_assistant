@@ -561,6 +561,16 @@ button:disabled {
   font-size: 13px;
 }
 
+.booking-row-danger-button {
+  color: #b42318;
+  font-weight: 800;
+}
+
+.booking-row-action-button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
 .booking-inline-detail {
   margin-top: -2px;
 }

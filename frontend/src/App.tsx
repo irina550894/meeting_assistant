@@ -18,6 +18,8 @@ import {
   addAdminMeetingType,
   addClosedDayRestriction,
   addTimeIntervalRestriction,
+  cancelAdminBooking,
+  cancelBooking,
   confirmAdminBooking,
   createBooking,
   deleteScheduleRestriction,
@@ -426,6 +428,28 @@ export function App() {
     }
   }
 
+  async function handleUserCancelBooking(booking: MiniAppBooking) {
+    if (!canCancelBooking(booking)) {
+      showToast("error", "Отмена недоступна менее чем за 2 часа до встречи");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      const updated = isPreview
+        ? { ...booking, status: "cancelled_by_user", cancellation_reason: null }
+        : await cancelBooking(booking.id, null);
+      setBookings((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      showToast("success", "Заявка отменена");
+      if (!isPreview) {
+        await refreshBookings();
+      }
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   async function refreshAdminData() {
     if (!user?.is_admin) {
       return;
@@ -537,6 +561,34 @@ export function App() {
       );
       setAdminRejectReason("");
       showToast("success", "Заявка отклонена");
+      if (!isPreview) {
+        await refreshAdminData();
+      }
+    } catch (error) {
+      showToast("error", errorText(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleAdminCancel(card: MiniAppAdminBookingCard) {
+    if (!canCancelBooking(card.booking)) {
+      showToast("error", "Отмена недоступна менее чем за 2 часа до встречи");
+      return;
+    }
+    setIsBusy(true);
+    try {
+      const updated = isPreview
+        ? {
+            ...card,
+            booking: { ...card.booking, status: "cancelled_by_user", cancellation_reason: null },
+          }
+        : await cancelAdminBooking(card.booking.id, null);
+      setSelectedAdminCard(updated);
+      setAdminBookings((current) =>
+        current.map((item) => (item.booking.id === updated.booking.id ? updated : item)),
+      );
+      showToast("success", "Встреча отменена");
       if (!isPreview) {
         await refreshAdminData();
       }
@@ -778,7 +830,12 @@ export function App() {
           />
         ) : null}
         {activeTab === "calendar" ? (
-          <CalendarScreen bookings={bookings} meetingTypes={meetingTypes} />
+          <CalendarScreen
+            bookings={bookings}
+            meetingTypes={meetingTypes}
+            isBusy={isBusy}
+            onCancel={(booking) => void handleUserCancelBooking(booking)}
+          />
         ) : null}
         {activeTab === "admin" ? (
           <AdminScreen
@@ -810,6 +867,7 @@ export function App() {
             onRejectReasonChange={setAdminRejectReason}
             onConfirm={(card) => void handleAdminConfirm(card)}
             onReject={(card) => void handleAdminReject(card)}
+            onCancel={(card) => void handleAdminCancel(card)}
             onNewClosedDayChange={setNewClosedDay}
             onNewClosedDayCommentChange={setNewClosedDayComment}
             onAddClosedDay={() => void handleAddClosedDay()}
@@ -1153,9 +1211,13 @@ function BookingForm({
 function CalendarScreen({
   bookings,
   meetingTypes,
+  isBusy,
+  onCancel,
 }: {
   bookings: MiniAppBooking[];
   meetingTypes: MiniAppMeetingType[];
+  isBusy: boolean;
+  onCancel: (booking: MiniAppBooking) => void;
 }) {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
@@ -1176,6 +1238,16 @@ function CalendarScreen({
           <BookingSummary booking={booking} meetingTypes={meetingTypes} />
           <div className="booking-row-actions">
             {isConfirmed && booking.meeting_url ? <MeetingLink href={booking.meeting_url} compact /> : null}
+            {canCancelBooking(booking) ? (
+              <button
+                type="button"
+                className="booking-row-action-button booking-row-danger-button"
+                disabled={isBusy}
+                onClick={() => onCancel(booking)}
+              >
+                Отменить
+              </button>
+            ) : null}
             {isConfirmed ? (
               <button
                 type="button"
@@ -1295,6 +1367,7 @@ function AdminScreen({
   onRejectReasonChange,
   onConfirm,
   onReject,
+  onCancel,
   onNewClosedDayChange,
   onNewClosedDayCommentChange,
   onAddClosedDay,
@@ -1340,6 +1413,7 @@ function AdminScreen({
   onRejectReasonChange: (value: string) => void;
   onConfirm: (card: MiniAppAdminBookingCard) => void;
   onReject: (card: MiniAppAdminBookingCard) => void;
+  onCancel: (card: MiniAppAdminBookingCard) => void;
   onNewClosedDayChange: (value: string) => void;
   onNewClosedDayCommentChange: (value: string) => void;
   onAddClosedDay: () => void;
@@ -1396,6 +1470,7 @@ function AdminScreen({
           onRejectReasonChange={onRejectReasonChange}
           onConfirm={onConfirm}
           onReject={onReject}
+          onCancel={onCancel}
         />
       ) : null}
       {view === "schedule" ? (
@@ -1493,6 +1568,7 @@ function AdminRequestsView({
   onRejectReasonChange,
   onConfirm,
   onReject,
+  onCancel,
 }: {
   dashboard: MiniAppAdminDashboard | null;
   cards: MiniAppAdminBookingCard[];
@@ -1507,6 +1583,7 @@ function AdminRequestsView({
   onRejectReasonChange: (value: string) => void;
   onConfirm: (card: MiniAppAdminBookingCard) => void;
   onReject: (card: MiniAppAdminBookingCard) => void;
+  onCancel: (card: MiniAppAdminBookingCard) => void;
 }) {
   const metrics = dashboard?.metrics;
   const sortedCards = cards.slice().sort((left, right) => {
@@ -1559,6 +1636,7 @@ function AdminRequestsView({
             onRejectReasonChange={onRejectReasonChange}
             onConfirm={onConfirm}
             onReject={onReject}
+            onCancel={onCancel}
           />
         ) : null}
       </Fragment>
@@ -1638,6 +1716,7 @@ function AdminBookingDetail({
   onRejectReasonChange,
   onConfirm,
   onReject,
+  onCancel,
 }: {
   card: MiniAppAdminBookingCard;
   meetingUrl: string;
@@ -1647,6 +1726,7 @@ function AdminBookingDetail({
   onRejectReasonChange: (value: string) => void;
   onConfirm: (card: MiniAppAdminBookingCard) => void;
   onReject: (card: MiniAppAdminBookingCard) => void;
+  onCancel: (card: MiniAppAdminBookingCard) => void;
 }) {
   return (
     <div className="detail-panel booking-inline-detail">
@@ -1710,6 +1790,19 @@ function AdminBookingDetail({
             </button>
           </div>
         </>
+      ) : null}
+      {card.booking.status === "confirmed" && canCancelBooking(card.booking) ? (
+        <div className="action-row">
+          <button
+            type="button"
+            className="danger-button"
+            disabled={isBusy}
+            onClick={() => onCancel(card)}
+          >
+            <XCircle size={18} aria-hidden="true" />
+            Отменить
+          </button>
+        </div>
       ) : null}
     </div>
   );
@@ -2384,6 +2477,16 @@ function activeBookings(bookings: MiniAppBooking[]): number {
   ).length;
 }
 
+function canCancelBooking(booking: MiniAppBooking): boolean {
+  if (booking.status === "pending") {
+    return true;
+  }
+  if (booking.status !== "confirmed") {
+    return false;
+  }
+  return new Date(booking.starts_at).getTime() - Date.now() >= 2 * 60 * 60 * 1000;
+}
+
 function isArchivedBooking(booking: MiniAppBooking): boolean {
   return new Date(booking.starts_at).getTime() < Date.now();
 }
@@ -2541,6 +2644,8 @@ function errorText(error: unknown): string {
     "Selected slot is busy in Google Calendar.":
       "Этот слот уже занят в Google Calendar. Выберите другое время.",
     calendar_conflict: "Этот слот уже занят в Google Calendar. Выберите другое время.",
+    cancellation_deadline_passed: "Отмена недоступна менее чем за 2 часа до встречи.",
+    booking_not_cancellable: "Эту заявку нельзя отменить.",
   };
 
   return labels[error.message] ?? error.message;

@@ -327,6 +327,29 @@ class BookingService:
             payload={"reason": reason},
         )
 
+    def cancel_booking_by_admin(
+        self,
+        booking: BookingRecord,
+        *,
+        now: datetime,
+        admin_user_id: str,
+        reason: str | None = None,
+    ) -> AuditEntry:
+        if booking.status != BookingStatus.CONFIRMED:
+            self._raise_rule("booking_not_cancellable", "Booking cannot be cancelled by admin.")
+
+        self._ensure_before_deadline(booking, now)
+        booking.cancellation_reason = reason
+        self._change_status(booking, BookingStatus.CANCELLED_BY_USER, now=now, reason=reason)
+        return self._audit(
+            actor_type="admin",
+            action="booking_cancelled_by_admin",
+            entity_type="booking",
+            entity_id=booking.id,
+            created_at=now,
+            payload={"admin_user_id": admin_user_id, "reason": reason},
+        )
+
     def block_user(
         self,
         user: UserProfile,

@@ -83,6 +83,19 @@ class TelegramAdminNotifier:
             text = f"Заявка отклонена. Причина: {reason}."
         await _send_telegram_message(self.bot, chat_id=user.telegram_id, text=text)
 
+    async def booking_cancelled_by_admin(
+        self,
+        booking: BookingRecord,
+        reason: str | None,
+    ) -> None:
+        user = await self.store.get(booking.user_id)
+        if not isinstance(user, UserProfile):
+            return
+        text = "Встреча отменена администратором."
+        if reason:
+            text = f"Встреча отменена администратором. Причина: {reason}."
+        await _send_telegram_message(self.bot, chat_id=user.telegram_id, text=text)
+
     async def user_blocked(self, user: UserProfile) -> None:
         await _send_telegram_message(
             self.bot,

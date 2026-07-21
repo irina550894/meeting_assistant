@@ -111,6 +111,11 @@ class FakeAdminBookingUseCases:
         self.pending_booking.rejection_reason = reason
         return await self.get_booking_card(booking_id)
 
+    async def cancel_booking(self, *, booking_id: UUID, admin_telegram_id: int, reason=None):
+        self.confirmed_booking.status = BookingStatus.CANCELLED_BY_USER
+        self.confirmed_booking.cancellation_reason = reason
+        return await self.get_booking_card(booking_id)
+
 
 class FakeAdminSettingsUseCases:
     def __init__(self) -> None:
@@ -315,6 +320,19 @@ def test_admin_confirm_and_reject_booking() -> None:
     assert reject_response.status_code == 200
     assert reject_response.json()["booking"]["status"] == "rejected"
     assert reject_response.json()["booking"]["rejection_reason"] == "No capacity"
+
+
+def test_admin_cancel_confirmed_booking() -> None:
+    client, booking_use_cases, _ = admin_api_client()
+
+    response = client.post(
+        f"/api/miniapp/admin/bookings/{booking_use_cases.confirmed_booking.id}/cancel",
+        json={"reason": "Client asked to cancel"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["booking"]["status"] == "cancelled_by_user"
+    assert response.json()["booking"]["cancellation_reason"] == "Client asked to cancel"
 
 
 def test_admin_schedule_settings_restrictions_and_working_hours() -> None:

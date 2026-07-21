@@ -89,6 +89,32 @@ class AdminFlowService:
         )
         return audit
 
+    def cancel_booking(
+        self,
+        *,
+        booking: BookingRecord,
+        now: datetime,
+        admin_telegram_id: int,
+        reason: str | None = None,
+    ) -> AuditEntry:
+        audit = self.booking_service.cancel_booking_by_admin(
+            booking,
+            now=now,
+            admin_user_id=str(admin_telegram_id),
+            reason=reason,
+        )
+        logger.info(
+            "Admin cancelled booking",
+            extra={
+                "event": "admin_action",
+                "action": "cancel_booking",
+                "admin_id": admin_telegram_id,
+                "booking_id": str(booking.id),
+                "has_reason": bool(reason),
+            },
+        )
+        return audit
+
     def complete_reschedule(
         self,
         *,

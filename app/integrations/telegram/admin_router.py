@@ -20,6 +20,7 @@ from app.integrations.telegram.admin_keyboards import (
     block_confirm_keyboard,
     blocked_users_keyboard,
     booking_filters_keyboard,
+    cancel_confirm_keyboard,
     meeting_types_admin_keyboard,
     reject_keyboard,
     restrictions_keyboard,
@@ -191,6 +192,25 @@ def create_admin_router(deps: AdminFlowDependencies) -> Router:
             reason=(message.text or "").strip() or None,
         )
         await state.clear()
+
+    @router.callback_query(F.data.startswith("adm:cancel:"))
+    async def cancel_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        booking_id = UUID((callback.data or "").removeprefix("adm:cancel:"))
+        await callback.answer()
+        await _answer(
+            callback,
+            messages.CANCEL_CONFIRM,
+            reply_markup=cancel_confirm_keyboard(booking_id),
+        )
+
+    @router.callback_query(F.data.startswith("adm:cancel_confirm:"))
+    async def cancel_confirm_callback(callback: CallbackQuery) -> None:
+        if not await _ensure_admin_callback(callback, deps):
+            return
+        booking_id = UUID((callback.data or "").removeprefix("adm:cancel_confirm:"))
+        await _cancel_booking(callback, deps, booking_id=booking_id, reason=None)
 
     @router.callback_query(F.data.startswith("adm:block:"))
     async def block_callback(callback: CallbackQuery) -> None:
@@ -627,7 +647,7 @@ async def _confirm_booking(
             admin_telegram_id=callback.from_user.id,
         )
     except BusinessRuleError as error:
-        await callback.answer(error.rule, show_alert=True)
+        await callback.answer(_business_error_text(error), show_alert=True)
         return
     except GoogleCalendarNotConnectedError as error:
         _log_google_calendar_error(error, operation="admin_confirm_booking")
@@ -679,7 +699,7 @@ async def _confirm_booking_message(
             admin_telegram_id=message.from_user.id,
         )
     except BusinessRuleError as error:
-        await message.answer(error.rule)
+        await message.answer(_business_error_text(error))
         return
     except GoogleCalendarNotConnectedError as error:
         _log_google_calendar_error(error, operation="admin_confirm_booking_message")
@@ -757,6 +777,36 @@ async def _reject_booking_message(
     if deps.notifier:
         await deps.notifier.booking_rejected(card.booking, reason)
     await message.answer(messages.BOOKING_REJECTED, reply_markup=admin_menu_keyboard())
+
+
+async def _cancel_booking(
+    callback: CallbackQuery,
+    deps: AdminFlowDependencies,
+    *,
+    booking_id: UUID,
+    reason: str | None,
+) -> None:
+    card = await _booking_card(booking_id, deps)
+    if not card:
+        await callback.answer(messages.ACTION_UNAVAILABLE, show_alert=True)
+        return
+    try:
+        audit = deps.admin_flow.cancel_booking(
+            booking=card.booking,
+            now=deps.clock(),
+            admin_telegram_id=callback.from_user.id,
+            reason=reason,
+        )
+    except BusinessRuleError as error:
+        await callback.answer(_business_error_text(error), show_alert=True)
+        return
+    await _cancel_calendar_event_if_needed(deps, card.booking, operation="admin_cancel_booking")
+    await deps.bookings.save_booking(card.booking)
+    await deps.bookings.save_audit_entries([audit])
+    if deps.notifier:
+        await deps.notifier.booking_cancelled_by_admin(card.booking, reason)
+    await callback.answer()
+    await _answer(callback, messages.BOOKING_CANCELLED, reply_markup=admin_menu_keyboard())
 
 
 async def _booking_card(
@@ -883,6 +933,16 @@ def _admin_access_error_text(error: AdminFlowError) -> str:
     if error.code == "admin_not_configured":
         return messages.ADMIN_NOT_CONFIGURED
     return messages.ADMIN_ACCESS_DENIED
+
+
+def _business_error_text(error: BusinessRuleError) -> str:
+    if error.rule == "cancellation_deadline_passed":
+        return "Отмена недоступна менее чем за 2 часа до встречи."
+    if error.rule == "booking_not_cancellable":
+        return "Эту заявку нельзя отменить."
+    if error.rule == "booking_not_pending":
+        return "Отклонять можно только заявки в статусе «Ожидает»."
+    return messages.ACTION_UNAVAILABLE
 
 
 def _diagnostics_text(report) -> str:

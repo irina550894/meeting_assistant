@@ -149,6 +149,31 @@ class AdminBookingUseCases:
             await self.deps.notifier.booking_rejected(card.booking, reason)
         return card
 
+    async def cancel_booking(
+        self,
+        *,
+        booking_id: UUID,
+        admin_telegram_id: int,
+        reason: str | None = None,
+    ) -> AdminBookingCard:
+        card = await self.get_booking_card(booking_id)
+        audit = self.deps.admin_flow.cancel_booking(
+            booking=card.booking,
+            now=self.deps.clock(),
+            admin_telegram_id=admin_telegram_id,
+            reason=reason,
+        )
+        audit = _with_mini_app_source(audit)
+        await self._cancel_calendar_event_if_needed(
+            card.booking,
+            operation="miniapp_admin_cancel_booking",
+        )
+        await self.deps.bookings.save_booking(card.booking)
+        await self.deps.bookings.save_audit_entries([audit])
+        if self.deps.notifier:
+            await self.deps.notifier.booking_cancelled_by_admin(card.booking, reason)
+        return card
+
     async def _complete_previous_reschedule_if_needed(self, booking: BookingRecord):
         if not booking.is_reschedule_request or not booking.previous_booking_id:
             return None

@@ -168,6 +168,16 @@ export async function rejectAdminBooking(
   });
 }
 
+export async function cancelAdminBooking(
+  bookingId: string,
+  reason: string | null,
+): Promise<MiniAppAdminBookingCard> {
+  return request<MiniAppAdminBookingCard>(`/api/miniapp/admin/bookings/${bookingId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function loadScheduleSettings(): Promise<MiniAppScheduleSettings> {
   return request<MiniAppScheduleSettings>("/api/miniapp/admin/schedule/settings");
 }

@@ -39,10 +39,25 @@ def admin_bookings_keyboard(bookings: Iterable[BookingRecord]) -> InlineKeyboard
 
 
 def admin_booking_actions_keyboard(booking: BookingRecord) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Подтвердить", callback_data=f"adm:approve:{booking.id}")],
-            [InlineKeyboardButton(text="Отклонить", callback_data=f"adm:reject:{booking.id}")],
+    rows = []
+    if booking.status == BookingStatus.PENDING:
+        rows.extend(
+            [
+                [
+                    InlineKeyboardButton(
+                        text="Подтвердить",
+                        callback_data=f"adm:approve:{booking.id}",
+                    )
+                ],
+                [InlineKeyboardButton(text="Отклонить", callback_data=f"adm:reject:{booking.id}")],
+            ]
+        )
+    elif booking.status == BookingStatus.CONFIRMED:
+        rows.append(
+            [InlineKeyboardButton(text="Отменить", callback_data=f"adm:cancel:{booking.id}")]
+        )
+    rows.extend(
+        [
             [InlineKeyboardButton(text="Написать", callback_data=f"adm:message:{booking.id}")],
             [
                 InlineKeyboardButton(
@@ -53,6 +68,7 @@ def admin_booking_actions_keyboard(booking: BookingRecord) -> InlineKeyboardMark
             [InlineKeyboardButton(text="Назад", callback_data="adm:pending")],
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def approve_keyboard(booking_id: UUID) -> InlineKeyboardMarkup:
@@ -88,6 +104,20 @@ def reject_keyboard(booking_id: UUID) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="Указать причину",
                     callback_data=f"adm:reject_reason:{booking_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="Назад", callback_data=f"adm:booking:{booking_id}")],
+        ]
+    )
+
+
+def cancel_confirm_keyboard(booking_id: UUID) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Подтвердить отмену",
+                    callback_data=f"adm:cancel_confirm:{booking_id}",
                 )
             ],
             [InlineKeyboardButton(text="Назад", callback_data=f"adm:booking:{booking_id}")],

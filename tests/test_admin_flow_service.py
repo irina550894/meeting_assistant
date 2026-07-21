@@ -107,6 +107,30 @@ def test_reject_booking_saves_reason_and_releases_reservation() -> None:
     assert audit.action == "booking_rejected"
 
 
+def test_cancel_confirmed_booking_by_admin_respects_deadline() -> None:
+    booking = pending_booking()
+    admin_flow().confirm_booking(
+        booking=booking,
+        confirmation=AdminConfirmationResult(
+            google_calendar_event_id="event-1",
+            meeting_url="https://meet.example.com/1",
+        ),
+        now=NOW,
+        admin_telegram_id=777,
+    )
+
+    audit = admin_flow().cancel_booking(
+        booking=booking,
+        now=NOW + timedelta(hours=1),
+        admin_telegram_id=777,
+        reason="Неактуально",
+    )
+
+    assert booking.status == BookingStatus.CANCELLED_BY_USER
+    assert booking.cancellation_reason == "Неактуально"
+    assert audit.action == "booking_cancelled_by_admin"
+
+
 def test_block_user_closes_active_bookings() -> None:
     user = consented_user()
     booking = pending_booking(user=user)

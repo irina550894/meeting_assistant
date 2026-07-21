@@ -28,6 +28,7 @@ from app.interfaces.http.schemas.miniapp import (
     MiniAppAdminMeetingTypeResponse,
     MiniAppAdminMeetingTypesResponse,
     MiniAppAdminRejectRequest,
+    MiniAppBookingCancelRequest,
     MiniAppBookingResponse,
     MiniAppClosedDayRestrictionCreateRequest,
     MiniAppMeetingTypeCreateRequest,
@@ -137,6 +138,24 @@ async def mini_app_admin_reject_booking(
 ) -> MiniAppAdminBookingCardResponse:
     try:
         card = await use_cases.reject_booking(
+            booking_id=booking_id,
+            admin_telegram_id=admin.telegram_id,
+            reason=payload.reason,
+        )
+    except BusinessRuleError as error:
+        raise _business_http_error(error) from error
+    return _admin_card_response(card)
+
+
+@router.post("/bookings/{booking_id}/cancel", response_model=MiniAppAdminBookingCardResponse)
+async def mini_app_admin_cancel_booking(
+    booking_id: UUID,
+    payload: MiniAppBookingCancelRequest,
+    admin: Annotated[UserProfile, Depends(get_current_mini_app_admin)],
+    use_cases: Annotated[AdminBookingUseCases, Depends(get_admin_booking_use_cases)],
+) -> MiniAppAdminBookingCardResponse:
+    try:
+        card = await use_cases.cancel_booking(
             booking_id=booking_id,
             admin_telegram_id=admin.telegram_id,
             reason=payload.reason,
