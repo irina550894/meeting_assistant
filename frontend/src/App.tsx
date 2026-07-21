@@ -11,7 +11,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
   acceptConsent,
@@ -137,6 +137,7 @@ export function App() {
   const [bookings, setBookings] = useState<MiniAppBooking[]>([]);
   const [meetingTypes, setMeetingTypes] = useState<MiniAppMeetingType[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [availableSlotDates, setAvailableSlotDates] = useState<string[]>([]);
   const [slots, setSlots] = useState<MiniAppSlot[]>([]);
   const [form, setForm] = useState<BookingFormState>(emptyForm);
   const [formStep, setFormStep] = useState<FormStep>("details");
@@ -181,10 +182,61 @@ export function App() {
 
   useEffect(() => {
     if (!form.meetingTypeId || !form.durationMinutes || auth.status === "loading") {
+      setAvailableSlotDates([]);
       return;
     }
     void refreshAvailableDates();
   }, [form.meetingTypeId, form.durationMinutes, auth.status]);
+
+  useEffect(() => {
+    if (!form.meetingTypeId || !form.durationMinutes || !availableDates.length || auth.status === "loading") {
+      setAvailableSlotDates([]);
+      return;
+    }
+
+    let cancelled = false;
+    setAvailableSlotDates([]);
+
+    async function refreshDatesWithSlots() {
+      try {
+        const checkedDates = await Promise.all(
+          availableDates.map(async (date) => {
+            const daySlots = isPreview
+              ? previewSlots(date)
+              : await loadSlots({
+                  date,
+                  meetingTypeId: form.meetingTypeId,
+                  durationMinutes: form.durationMinutes,
+                });
+            return daySlots.length ? date : null;
+          }),
+        );
+        if (cancelled) {
+          return;
+        }
+        const nextDates = checkedDates.filter((date): date is string => Boolean(date));
+        setAvailableSlotDates(nextDates);
+      } catch (error) {
+        if (!cancelled) {
+          setAvailableSlotDates([]);
+          showToast("error", errorText(error));
+        }
+      }
+    }
+
+    void refreshDatesWithSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [availableDates, auth.status, form.durationMinutes, form.meetingTypeId, isPreview]);
+
+  useEffect(() => {
+    if (!form.date || !availableSlotDates.length || availableSlotDates.includes(form.date)) {
+      return;
+    }
+    setForm((current) => ({ ...current, date: "", slotKey: "" }));
+    setSlots([]);
+  }, [availableSlotDates, form.date]);
 
   useEffect(() => {
     if (!form.meetingTypeId || !form.durationMinutes || !form.date || auth.status === "loading") {
@@ -208,9 +260,11 @@ export function App() {
 
       if (!initData) {
         const previewBookingsData = previewBookings();
+        const previewAvailableDates = previewDates();
         setBookings(previewBookingsData);
         setMeetingTypes(previewMeetingTypes);
-        setAvailableDates(previewDates());
+        setAvailableDates(previewAvailableDates);
+        setAvailableSlotDates(previewAvailableDates);
         setAuth({ status: "preview", config: loadedConfig, user: previewUser });
         setForm((current) => ({
           ...current,
@@ -676,7 +730,7 @@ export function App() {
             formStep={formStep}
             isBusy={isBusy}
             meetingTypes={meetingTypes}
-            availableDates={availableDates}
+            availableDates={availableSlotDates}
             slots={slots}
             activeBookingsCount={activeBookings(bookings)}
             consentChecked={personalDataConsentChecked}
@@ -752,7 +806,7 @@ function Header({ isPreview }: { isPreview: boolean }) {
       <section className="top-panel">
         <div>
           <h1>Добрый день!</h1>
-          <p>В данном приложении Вы можете записаться на встречу с Ириной Бирюковой</p>
+          <p>В данном приложении Вы можете записаться на встречу по финансам с Ириной Бирюковой.</p>
         </div>
       </section>
       {isPreview ? (
@@ -1067,54 +1121,94 @@ function CalendarScreen({
   bookings: MiniAppBooking[];
   meetingTypes: MiniAppMeetingType[];
 }) {
-  const [selectedBooking, setSelectedBooking] = useState<MiniAppBooking | null>(null);
-  const visibleBookings = (bookings.length ? bookings : previewBookings()).slice().sort((left, right) => {
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const sortedBookings = (bookings.length ? bookings : previewBookings()).slice().sort((left, right) => {
     const leftValue = left.created_at ?? left.starts_at;
     const rightValue = right.created_at ?? right.starts_at;
     return rightValue.localeCompare(leftValue);
   });
+  const currentBookings = sortedBookings.filter((booking) => !isArchivedBooking(booking));
+  const archivedBookings = sortedBookings.filter(isArchivedBooking);
+
+  function renderBooking(booking: MiniAppBooking) {
+    const isConfirmed = booking.status === "confirmed";
+    const isSelected = selectedBookingId === booking.id;
+    return (
+      <Fragment key={booking.id}>
+        <div className={isConfirmed ? "booking-row booking-row-expandable" : "booking-row"}>
+          <BookingSummary booking={booking} meetingTypes={meetingTypes} />
+          <div className="booking-row-actions">
+            {isConfirmed && booking.meeting_url ? <MeetingLink href={booking.meeting_url} compact /> : null}
+            {isConfirmed ? (
+              <button
+                type="button"
+                className="booking-row-action-button"
+                onClick={() => setSelectedBookingId(isSelected ? null : booking.id)}
+              >
+                {isSelected ? "Скрыть" : "Открыть"}
+              </button>
+            ) : (
+              <Clock3 size={18} aria-hidden="true" />
+            )}
+          </div>
+        </div>
+        {isSelected ? <BookingDetail booking={booking} meetingTypes={meetingTypes} /> : null}
+      </Fragment>
+    );
+  }
 
   return (
     <>
-      <PanelHeader title="Мои заявки" action={`${visibleBookings.length}`} />
+      <PanelHeader title="Мои заявки" action={`${currentBookings.length}`} />
       <div className="timeline-list compact-list">
-        {visibleBookings.map((booking) =>
-          booking.status === "confirmed" ? (
-            <button
-              key={booking.id}
-              type="button"
-              className="booking-row booking-row-button"
-              onClick={() => setSelectedBooking(booking)}
-            >
-              <BookingSummary booking={booking} meetingTypes={meetingTypes} />
-              <span>Открыть</span>
-            </button>
-          ) : (
-            <div key={booking.id} className="booking-row">
-              <BookingSummary booking={booking} meetingTypes={meetingTypes} />
-              <Clock3 size={18} aria-hidden="true" />
-            </div>
-          ),
-        )}
+        {currentBookings.map(renderBooking)}
       </div>
-      {selectedBooking ? (
-        <div className="detail-panel">
-          <PanelHeader
-            title={`Заявка ${bookingNumberLabel(selectedBooking)}`}
-            action={statusLabel(selectedBooking.status)}
-          />
-          <ReviewRow label="Тип" value={bookingTypeName(meetingTypes, selectedBooking)} />
-          <ReviewRow label="Дата" value={dateLabel(selectedBooking.starts_at)} />
-          <ReviewRow label="Время" value={timeLabel(selectedBooking.starts_at)} />
-          <ReviewRow label="Длительность" value={`${selectedBooking.duration_minutes} минут`} />
-          <ReviewRow label="Статус" value={statusLabel(selectedBooking.status)} />
-          <ReviewRow label="Комментарий" value={selectedBooking.user_comment || "Без комментария"} />
-          {selectedBooking.meeting_url ? (
-            <MeetingLink href={selectedBooking.meeting_url} />
-          ) : null}
-        </div>
-      ) : null}
+      <section className="archive-panel">
+        <button
+          type="button"
+          className="archive-toggle"
+          onClick={() => setIsArchiveOpen((current) => !current)}
+          aria-expanded={isArchiveOpen}
+        >
+          <span>Архив</span>
+          <strong>{archivedBookings.length}</strong>
+        </button>
+        {isArchiveOpen ? (
+          <div className="timeline-list archive-list">
+            {archivedBookings.length ? (
+              archivedBookings.map(renderBooking)
+            ) : (
+              <p className="panel-copy">В архиве пока нет заявок.</p>
+            )}
+          </div>
+        ) : null}
+      </section>
     </>
+  );
+}
+
+function BookingDetail({
+  booking,
+  meetingTypes,
+}: {
+  booking: MiniAppBooking;
+  meetingTypes: MiniAppMeetingType[];
+}) {
+  return (
+    <div className="detail-panel booking-inline-detail">
+      <PanelHeader
+        title={`Заявка ${bookingNumberLabel(booking)}`}
+        action={statusLabel(booking.status)}
+      />
+      <ReviewRow label="Тип" value={bookingTypeName(meetingTypes, booking)} />
+      <ReviewRow label="Дата" value={dateLabel(booking.starts_at)} />
+      <ReviewRow label="Время" value={timeLabel(booking.starts_at)} />
+      <ReviewRow label="Длительность" value={`${booking.duration_minutes} минут`} />
+      <ReviewRow label="Статус" value={statusLabel(booking.status)} />
+      <ReviewRow label="Комментарий" value={booking.user_comment || "Без комментария"} />
+      {booking.meeting_url ? <MeetingLink href={booking.meeting_url} /> : null}
+    </div>
   );
 }
 
@@ -1924,9 +2018,14 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MeetingLink({ href }: { href: string }) {
+function MeetingLink({ href, compact = false }: { href: string; compact?: boolean }) {
   return (
-    <a className="meeting-url-link" href={href} target="_blank" rel="noreferrer">
+    <a
+      className={compact ? "meeting-url-link meeting-url-link-compact" : "meeting-url-link"}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
       Ссылка на видеовстречу
     </a>
   );
@@ -2090,6 +2189,10 @@ function activeBookings(bookings: MiniAppBooking[]): number {
   return bookings.filter((booking) =>
     ["pending", "confirmed", "reschedule_requested"].includes(booking.status),
   ).length;
+}
+
+function isArchivedBooking(booking: MiniAppBooking): boolean {
+  return new Date(booking.starts_at).getTime() < Date.now();
 }
 
 function statusLabel(status: string): string {

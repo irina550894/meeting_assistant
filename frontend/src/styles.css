@@ -94,7 +94,7 @@ button:disabled {
 
 .top-panel h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 15px;
   line-height: 1.12;
 }
 
@@ -102,9 +102,9 @@ button:disabled {
   max-width: 440px;
   margin: 8px 0 0;
   color: rgba(255, 255, 255, 0.86);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.42;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1.2;
 }
 
 .notice {
@@ -465,6 +465,13 @@ button:disabled {
   text-decoration: none;
 }
 
+.meeting-url-link-compact {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
 .timeline-list {
   display: grid;
   gap: 10px;
@@ -482,12 +489,8 @@ button:disabled {
   background: var(--panel-strong);
 }
 
-.booking-row-button {
-  width: 100%;
-  border: 1px solid var(--line);
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
+.booking-row-expandable {
+  align-items: flex-start;
 }
 
 .booking-row div {
@@ -503,6 +506,69 @@ button:disabled {
   font-size: 12px;
   font-weight: 800;
   text-decoration: none;
+}
+
+.booking-row .booking-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.booking-row-action-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.booking-inline-detail {
+  margin-top: -2px;
+}
+
+.archive-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 253, 248, 0.72);
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.archive-toggle span {
+  font-size: 22px;
+}
+
+.archive-toggle strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: var(--rose);
+  color: var(--purple);
+  font-size: 14px;
+}
+
+.archive-list {
+  margin-top: 2px;
 }
 
 .calendar-card {
@@ -856,6 +922,10 @@ button:disabled {
   }
 
   .top-panel h1 {
+    font-size: 14px;
+  }
+
+  .top-panel p {
     font-size: 21px;
   }
 
