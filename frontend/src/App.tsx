@@ -1067,6 +1067,7 @@ function CalendarScreen({
   bookings: MiniAppBooking[];
   meetingTypes: MiniAppMeetingType[];
 }) {
+  const [selectedBooking, setSelectedBooking] = useState<MiniAppBooking | null>(null);
   const visibleBookings = (bookings.length ? bookings : previewBookings()).slice().sort((left, right) => {
     const leftValue = left.created_at ?? left.starts_at;
     const rightValue = right.created_at ?? right.starts_at;
@@ -1077,20 +1078,61 @@ function CalendarScreen({
     <>
       <PanelHeader title="Мои заявки" action={`${visibleBookings.length}`} />
       <div className="timeline-list compact-list">
-        {visibleBookings.map((booking) => (
-          <div key={booking.id} className="booking-row">
-            <div>
-              <strong>{bookingNumberLabel(booking)}</strong>
-              <span>Тип: {bookingTypeName(meetingTypes, booking)}</span>
-              <span>Дата: {dateLabel(booking.starts_at)}</span>
-              <span>Время: {timeLabel(booking.starts_at)}</span>
-              <span>Статус: {statusLabel(booking.status)}</span>
+        {visibleBookings.map((booking) =>
+          booking.status === "confirmed" ? (
+            <button
+              key={booking.id}
+              type="button"
+              className="booking-row booking-row-button"
+              onClick={() => setSelectedBooking(booking)}
+            >
+              <BookingSummary booking={booking} meetingTypes={meetingTypes} />
+              <span>Открыть</span>
+            </button>
+          ) : (
+            <div key={booking.id} className="booking-row">
+              <BookingSummary booking={booking} meetingTypes={meetingTypes} />
+              <Clock3 size={18} aria-hidden="true" />
             </div>
-            <Clock3 size={18} aria-hidden="true" />
-          </div>
-        ))}
+          ),
+        )}
       </div>
+      {selectedBooking ? (
+        <div className="detail-panel">
+          <PanelHeader
+            title={`Заявка ${bookingNumberLabel(selectedBooking)}`}
+            action={statusLabel(selectedBooking.status)}
+          />
+          <ReviewRow label="Тип" value={bookingTypeName(meetingTypes, selectedBooking)} />
+          <ReviewRow label="Дата" value={dateLabel(selectedBooking.starts_at)} />
+          <ReviewRow label="Время" value={timeLabel(selectedBooking.starts_at)} />
+          <ReviewRow label="Длительность" value={`${selectedBooking.duration_minutes} минут`} />
+          <ReviewRow label="Статус" value={statusLabel(selectedBooking.status)} />
+          <ReviewRow label="Комментарий" value={selectedBooking.user_comment || "Без комментария"} />
+          {selectedBooking.meeting_url ? (
+            <MeetingLink href={selectedBooking.meeting_url} />
+          ) : null}
+        </div>
+      ) : null}
     </>
+  );
+}
+
+function BookingSummary({
+  booking,
+  meetingTypes,
+}: {
+  booking: MiniAppBooking;
+  meetingTypes: MiniAppMeetingType[];
+}) {
+  return (
+    <div>
+      <strong>{bookingNumberLabel(booking)}</strong>
+      <span>Тип: {bookingTypeName(meetingTypes, booking)}</span>
+      <span>Дата: {dateLabel(booking.starts_at)}</span>
+      <span>Время: {timeLabel(booking.starts_at)}</span>
+      <span>Статус: {statusLabel(booking.status)}</span>
+    </div>
   );
 }
 
@@ -1339,6 +1381,9 @@ function AdminRequestsView({
           <ReviewRow label="Тип" value={selectedCard.meeting_type.name} />
           <ReviewRow label="Время" value={dateTimeLabel(selectedCard.booking.starts_at)} />
           <ReviewRow label="Комментарий" value={selectedCard.booking.user_comment || "Без комментария"} />
+          {selectedCard.booking.status === "confirmed" && selectedCard.booking.meeting_url ? (
+            <MeetingLink href={selectedCard.booking.meeting_url} />
+          ) : null}
           {selectedCard.booking.status === "pending" ? (
             <>
               <label className="wide-field">
@@ -1562,20 +1607,22 @@ function AdminScheduleView({
       ) : null}
       <div className="detail-panel">
         <PanelHeader title="Рабочие часы" action={`${workingHours.length}`} />
-        {workingHours.map((row) => (
-          <button
-            key={row.weekday}
-            type="button"
-            className="booking-row booking-row-button"
-            onClick={() => beginWorkingHoursEdit(row)}
-          >
-            <div>
-              <strong>{weekdayName(row.weekday)}</strong>
-              <span>{workingHoursLabel(row)}</span>
-            </div>
-            <span>Изменить</span>
-          </button>
-        ))}
+        <div className="working-hours-grid">
+          {workingHours.map((row) => (
+            <button
+              key={row.weekday}
+              type="button"
+              className="booking-row booking-row-button working-hour-card"
+              onClick={() => beginWorkingHoursEdit(row)}
+            >
+              <div>
+                <strong>{weekdayName(row.weekday)}</strong>
+                <span>{workingHoursLabel(row)}</span>
+              </div>
+              <span>Изменить</span>
+            </button>
+          ))}
+        </div>
         {editingWeekday !== null ? (
           <div className="working-hours-editor">
             <PanelHeader title={weekdayName(editingWeekday)} action="Рабочие часы" />
@@ -1649,7 +1696,7 @@ function AdminScheduleView({
               onChange={(event) => onNewClosedDayChange(event.target.value)}
             />
           </label>
-          <label className="wide-field">
+          <label className="wide-field compact-textarea-field">
             <span>Комментарий</span>
             <textarea
               value={newClosedDayComment}
@@ -1694,7 +1741,7 @@ function AdminScheduleView({
               onChange={(event) => onNewClosedHoursEndChange(event.target.value)}
             />
           </label>
-          <label className="wide-field">
+          <label className="wide-field compact-textarea-field">
             <span>Комментарий</span>
             <textarea
               value={newClosedHoursComment}
@@ -1874,6 +1921,14 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function MeetingLink({ href }: { href: string }) {
+  return (
+    <a className="meeting-url-link" href={href} target="_blank" rel="noreferrer">
+      Ссылка на видеовстречу
+    </a>
   );
 }
 

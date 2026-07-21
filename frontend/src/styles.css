@@ -284,6 +284,10 @@ button:disabled {
   resize: vertical;
 }
 
+.compact-textarea-field textarea {
+  min-height: 43px;
+}
+
 .date-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -446,6 +450,19 @@ button:disabled {
 .review-row strong {
   max-width: 62%;
   text-align: right;
+}
+
+.meeting-url-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--purple);
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .timeline-list {
@@ -693,6 +710,25 @@ button:disabled {
   padding-top: 6px;
 }
 
+.working-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.working-hour-card {
+  align-items: start;
+  min-height: 96px;
+  padding: 12px;
+  flex-direction: column;
+}
+
+.working-hour-card:nth-child(7) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc(50% - 4px);
+}
+
 .toggle-row {
   display: inline-flex;
   align-items: center;
@@ -838,8 +874,13 @@ button:disabled {
 
   .slot-grid,
   .admin-summary-grid,
+  .working-hours-grid,
   .action-row {
     grid-template-columns: 1fr;
+  }
+
+  .working-hour-card:nth-child(7) {
+    width: 100%;
   }
 
   .bottom-nav {
