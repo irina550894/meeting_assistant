@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     google_calendar_id: str = "primary"
     google_admin_email: str | None = None
 
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from_email: str | None = None
+    smtp_from_name: str = "Ассистент по встречам"
+    smtp_use_tls: bool = True
+
     default_meeting_url: str | None = None
     booking_horizon_days: int = 30
     min_booking_lead_days: int = 1
@@ -85,6 +93,10 @@ class Settings(BaseSettings):
         "google_oauth_redirect_uri",
         "google_oauth_refresh_token",
         "google_admin_email",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from_email",
         "default_meeting_url",
         "personal_data_consent_url",
         "personal_data_policy_url",
@@ -115,6 +127,7 @@ class Settings(BaseSettings):
                 self.google_oauth_client_id and self.google_oauth_client_secret
             ),
             "google_refresh_token_configured": self.google_oauth_refresh_token is not None,
+            "smtp_configured": bool(self.smtp_host and self.smtp_from_email),
         }
 
 

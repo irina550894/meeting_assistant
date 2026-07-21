@@ -18,11 +18,13 @@ from app.application import (
 from app.core.admin_flow import AdminFlowService
 from app.core.booking import BookingService, UserProfile
 from app.core.user_flow import UserFlowService
+from app.integrations.email import UserEmailNotifier
 from app.integrations.google_calendar import (
     GoogleCalendarConfirmationGateway,
     GoogleCalendarEventGateway,
     GoogleCalendarScheduleProvider,
 )
+from app.integrations.notifications import CompositeAdminNotifier, CompositeUserFlowNotifier
 from app.integrations.telegram.local_memory import LocalCalendarConfirmationGateway
 from app.integrations.telegram.local_notifiers import (
     TelegramAdminNotifier,
@@ -106,11 +108,10 @@ async def get_user_booking_use_cases(request: Request) -> UserBookingUseCases:
     )
     event_gateway = GoogleCalendarEventGateway(google_calendar) if google_calendar else None
     runtime = getattr(request.app.state, "telegram_runtime", None)
-    notifier = (
-        TelegramUserFlowNotifier(bot=runtime.bot, settings=settings)
-        if runtime is not None
-        else None
-    )
+    notifiers = [UserEmailNotifier(settings=settings, store=store)]
+    if runtime is not None:
+        notifiers.append(TelegramUserFlowNotifier(bot=runtime.bot, settings=settings))
+    notifier = CompositeUserFlowNotifier(notifiers)
     background_jobs = (
         CommittedBackgroundJobScheduler(session_factory=AsyncSessionFactory, settings=settings)
         if settings.telegram_storage.strip().lower() == "postgres"
@@ -149,7 +150,10 @@ async def get_admin_booking_use_cases(request: Request) -> AdminBookingUseCases:
     )
     event_gateway = GoogleCalendarEventGateway(google_calendar) if google_calendar else None
     runtime = getattr(request.app.state, "telegram_runtime", None)
-    notifier = TelegramAdminNotifier(bot=runtime.bot, store=store) if runtime is not None else None
+    notifiers = [UserEmailNotifier(settings=settings, store=store)]
+    if runtime is not None:
+        notifiers.append(TelegramAdminNotifier(bot=runtime.bot, store=store))
+    notifier = CompositeAdminNotifier(notifiers)
     background_jobs = (
         CommittedBackgroundJobScheduler(session_factory=AsyncSessionFactory, settings=settings)
         if settings.telegram_storage.strip().lower() == "postgres"

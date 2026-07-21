@@ -107,6 +107,13 @@ https://calendar.finforbiz.pro/miniapp/
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REDIRECT_URI`
 - `GOOGLE_CALENDAR_ID`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USERNAME`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `SMTP_USE_TLS`
 
 ## Что обязательно сделать после закрытия
 

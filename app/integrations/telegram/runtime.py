@@ -13,6 +13,7 @@ from app.core.admin_flow import AdminFlowService
 from app.core.booking import BookingService
 from app.core.user_flow import UserFlowService
 from app.diagnostics import DiagnosticsService
+from app.integrations.email import UserEmailNotifier
 from app.integrations.google_calendar import (
     GoogleCalendarClient,
     GoogleCalendarConfirmationGateway,
@@ -20,6 +21,7 @@ from app.integrations.google_calendar import (
     GoogleCalendarScheduleProvider,
     GoogleOAuthTokens,
 )
+from app.integrations.notifications import CompositeAdminNotifier, CompositeUserFlowNotifier
 from app.integrations.telegram.admin_router import create_admin_router
 from app.integrations.telegram.critical_notifications import notify_critical_admin
 from app.integrations.telegram.keyboards import MINI_APP_BUTTON_TEXT
@@ -113,7 +115,12 @@ async def build_telegram_runtime(settings) -> TelegramRuntime:
         flow=UserFlowService(booking_service=booking_service),
         booking_service=booking_service,
         clock=clock,
-        notifier=TelegramUserFlowNotifier(bot=bot, settings=settings),
+        notifier=CompositeUserFlowNotifier(
+            [
+                UserEmailNotifier(settings=settings, store=store),
+                TelegramUserFlowNotifier(bot=bot, settings=settings),
+            ]
+        ),
         calendar_events=event_gateway,
         background_jobs=background_jobs,
     )
@@ -125,7 +132,12 @@ async def build_telegram_runtime(settings) -> TelegramRuntime:
         admin_flow=AdminFlowService(booking_service=booking_service),
         calendar=confirmation_gateway,
         clock=clock,
-        notifier=TelegramAdminNotifier(bot=bot, store=store),
+        notifier=CompositeAdminNotifier(
+            [
+                UserEmailNotifier(settings=settings, store=store),
+                TelegramAdminNotifier(bot=bot, store=store),
+            ]
+        ),
         calendar_events=event_gateway,
         background_jobs=background_jobs,
         diagnostics=DiagnosticsService(

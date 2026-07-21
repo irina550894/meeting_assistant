@@ -48,6 +48,7 @@ Required values:
 - `PERSONAL_DATA_POLICY_URL`
 - `MINI_APP_FRONTEND_DIST_PATH`
 - Google OAuth and Calendar values.
+- SMTP values for user email notifications, if email delivery is enabled.
 
 Mini App button in Telegram is enabled only when `MINI_APP_ENABLED=true` and
 `PUBLIC_BASE_URL` starts with `https://`.
@@ -241,8 +242,8 @@ updates.
   inside the Docker network.
 - Telegram runs through HTTPS webhook in production.
 - Caddy obtains and renews HTTPS certificates automatically.
-- Email delivery is handled by Google Calendar invitations/cancellations. There is
-  no separate SMTP service in MVP.
+- Google Calendar invitations/cancellations are still created for calendar events.
+- Optional SMTP delivery sends additional status emails to the user's email address only.
 
 ## Automatic GitHub Actions deploy
 
