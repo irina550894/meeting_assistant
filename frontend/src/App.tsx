@@ -1231,24 +1231,16 @@ function CalendarScreen({
 
   function renderBooking(booking: MiniAppBooking) {
     const isConfirmed = booking.status === "confirmed";
+    const isCancellable = canCancelBooking(booking);
+    const isExpandable = isConfirmed || isCancellable;
     const isSelected = selectedBookingId === booking.id;
     return (
       <Fragment key={booking.id}>
-        <div className={isConfirmed ? "booking-row booking-row-expandable" : "booking-row"}>
+        <div className={isExpandable ? "booking-row booking-row-expandable" : "booking-row"}>
           <BookingSummary booking={booking} meetingTypes={meetingTypes} />
           <div className="booking-row-actions">
             {isConfirmed && booking.meeting_url ? <MeetingLink href={booking.meeting_url} compact /> : null}
-            {canCancelBooking(booking) ? (
-              <button
-                type="button"
-                className="booking-row-action-button booking-row-danger-button"
-                disabled={isBusy}
-                onClick={() => onCancel(booking)}
-              >
-                Отменить
-              </button>
-            ) : null}
-            {isConfirmed ? (
+            {isExpandable ? (
               <button
                 type="button"
                 className="booking-row-action-button"
@@ -1261,7 +1253,14 @@ function CalendarScreen({
             )}
           </div>
         </div>
-        {isSelected ? <BookingDetail booking={booking} meetingTypes={meetingTypes} /> : null}
+        {isSelected ? (
+          <BookingDetail
+            booking={booking}
+            meetingTypes={meetingTypes}
+            isBusy={isBusy}
+            onCancel={onCancel}
+          />
+        ) : null}
       </Fragment>
     );
   }
@@ -1299,9 +1298,13 @@ function CalendarScreen({
 function BookingDetail({
   booking,
   meetingTypes,
+  isBusy,
+  onCancel,
 }: {
   booking: MiniAppBooking;
   meetingTypes: MiniAppMeetingType[];
+  isBusy: boolean;
+  onCancel: (booking: MiniAppBooking) => void;
 }) {
   return (
     <div className="detail-panel booking-inline-detail">
@@ -1316,6 +1319,19 @@ function BookingDetail({
       <ReviewRow label="Статус" value={statusLabel(booking.status)} />
       <ReviewRow label="Комментарий" value={booking.user_comment || "Без комментария"} />
       {booking.meeting_url ? <MeetingLink href={booking.meeting_url} /> : null}
+      {canCancelBooking(booking) ? (
+        <div className="action-row">
+          <button
+            type="button"
+            className="danger-button"
+            disabled={isBusy}
+            onClick={() => onCancel(booking)}
+          >
+            <XCircle size={18} aria-hidden="true" />
+            Отменить
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2488,6 +2504,9 @@ function canCancelBooking(booking: MiniAppBooking): boolean {
 }
 
 function isArchivedBooking(booking: MiniAppBooking): boolean {
+  if (booking.status === "rejected") {
+    return true;
+  }
   return new Date(booking.starts_at).getTime() < Date.now();
 }
 
